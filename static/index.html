@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>イカサマ駆け引き型カードゲーム 3D（オフライン操作対応）</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+
+<body>
+  <!-- 3D Canvas -->
+  <div id="game-3d-container" style="position:absolute; top:0; left:0; width:100%; height:100%; z-index:1;"></div>
+
+  <!-- 2Dカーソル（キーボード操作用） -->
+  <div id="kb-cursor" class="kb-cursor" style="display:none;">
+    <div class="kb-cursor-dot"></div>
+    <div class="kb-cursor-label" id="kb-cursor-label">HAND</div>
+  </div>
+
+  <!-- 操作ヘルプ -->
+  <div class="help-overlay">
+    <div class="help-title">操作</div>
+    <div class="help-line">↑↓←→：カーソル移動</div>
+    <div class="help-line"><b>Z</b>：決定（対象によってメニュー/アクション）</div>
+    <div class="help-line"><b>X</b>：キャンセル（メニュー閉じる）</div>
+    <div class="help-line"><b>C</b>：指摘（Accuse）</div>
+    <div class="help-line">右クリック：イカサマメニュー（マウス）</div>
+  </div>
+
+  <!-- UI オーバーレイ -->
+  <div class="game-ui-overlay">
+    <div class="ui-layer">
+      <!-- 中央情報パネル -->
+      <div class="center-panel">
+        <div class="penalty-row" id="penalty-opponent">
+          <div class="penalty-card"></div>
+          <div class="penalty-card"></div>
+          <div class="penalty-card"></div>
+        </div>
+
+        <div class="turn-label" id="opponent-turn-label">相手のターン</div>
+        <div class="timer" id="timer">60</div>
+        <div class="turn-label" id="player-turn-label">あなたのターン</div>
+
+        <div class="penalty-row" id="penalty-player">
+          <div class="penalty-card"></div>
+          <div class="penalty-card"></div>
+          <div class="penalty-card"></div>
+        </div>
+
+        <div style="display:flex; gap:10px; justify-content:center;">
+          <button id="btn-start" style="pointer-events:auto;">START</button>
+          <button id="btn-endturn" style="pointer-events:auto;">END TURN</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ✅ 十字型アクションメニュー（Zで出す） -->
+  <div class="action-menu" id="action-menu" style="display:none;">
+    <div class="action-menu-center" id="action-menu-center">手札</div>
+
+    <div class="action-menu-item up" id="action-up">
+      <div class="action-text" id="action-up-text">—</div>
+    </div>
+
+    <div class="action-menu-item left" id="action-left">
+      <div class="action-text" id="action-left-text">—</div>
+    </div>
+
+    <div class="action-menu-item down" id="action-down">
+      <div class="action-text" id="action-down-text">—</div>
+    </div>
+
+    <div class="action-menu-item right" id="action-right">
+      <div class="action-text" id="action-right-text">—</div>
+    </div>
+  </div>
+
+  <!-- イカサマコンテキストメニュー -->
+  <div class="cheat-menu" id="cheat-menu" style="display:none;">
+    <div class="menu-item" data-action="summon-own">自分の手札から召喚（マナ無視）</div>
+    <div class="menu-item" data-action="destroy-opponent">相手フォロワーを破壊</div>
+    <div class="menu-item" data-action="steal-opponent">相手フォロワーを奪う</div>
+    <div class="menu-item" data-action="add-own-hand">自分の手札を増やす</div>
+    <div class="menu-item" data-action="remove-own-hand">自分の手札を減らす</div>
+    <div class="menu-item" data-action="add-opponent-hand">相手の手札を増やす</div>
+    <div class="menu-item" data-action="remove-opponent-hand">相手の手札を減らす</div>
+    <div class="menu-item" data-action="modify-hp">体力を変更</div>
+    <div class="menu-item" data-action="modify-mana">マナを変更</div>
+  </div>
+
+  <!-- 指摘UI -->
+  <div class="accuse-ui" id="accuse-ui" style="display:none;">
+    <div class="accuse-content">
+      <h2>イカサマを指摘！</h2>
+      <div class="accuse-timer" id="accuse-timer">10</div>
+
+      <div class="accuse-log" id="accuse-log">
+        <p>直近10秒以内の相手のイカサマを選択してください：</p>
+        <div id="cheat-options"></div>
+      </div>
+
+      <button id="accuse-cancel">キャンセル</button>
+    </div>
+  </div>
+
+  <!-- ゲーム終了画面 -->
+  <div class="game-over" id="game-over" style="display:none;">
+    <div class="game-over-content">
+      <h1 id="game-over-title">ゲーム終了</h1>
+      <p id="game-over-message"></p>
+      <button onclick="location.reload()">リスタート</button>
+    </div>
+  </div>
+
+  <!-- 接続パネル（オフラインでは隠す） -->
+  <div id="connection-panel">
+    <h3>通信（WebSocket）設定</h3>
+    <p>ルームID: <span id="room-id-label" style="font-weight:bold; color:#aaf;"></span></p>
+    <p>あなたの役割: <span id="my-role" style="font-weight:bold; color:#afa;">未接続</span></p>
+    <hr>
+    <p id="connection-status">未接続</p>
+    <p style="opacity:0.8; font-size:12px;">同じルームIDで2人入ると対戦できます。</p>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
