@@ -435,28 +435,68 @@ def get_room(room_id: str) -> Room:
 # =========================
 app = FastAPI()
 
-# ルートパスでtitle.htmlを返す
+# 先攻・後攻ランダム決定API
+@app.post("/api/first_attack")
+async def decide_first_attack():
+    import random
+    first = random.choice(["player", "opponent"])
+    return {"first": first}
+
+# ルートパスでindex.htmlを返す
 @app.get("/")
 async def root():
-    return FileResponse("static/title.html")
+    return FileResponse("static/index.html")
 
 # 静的ファイル配信
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+app.mount("/static", StaticFiles(directory="static", html=True), name="static")
 
 
 @app.websocket("/ws/{room_id}")
-async def ws_room(websocket: WebSocket, room_id: str):
+async def ws_room(websocket: WebSocket, room_id: str, mode: str = "create"):
     await websocket.accept()
 
-    room = get_room(room_id)
-    role = room.assign_role()
-
-    async with room.lock:
-        room.clients[websocket] = role
+    room_exists = room_id in ROOMS
+    
+    if mode == "join":
+        # 「部屋を探す」モード：既存のルームにのみ接続可能
+        if not room_exists:
+            await websocket.send_text(json.dumps({"type": "error", "message": "部屋が見つかりませんでした"}, ensure_ascii=False))
+            await websocket.close()
+            return
+        
+        room = ROOMS[room_id]
+        async with room.lock:
+            if len(room.clients) >= 2:
+                await websocket.send_text(json.dumps({"type": "error", "message": "このルームは既に満員です"}, ensure_ascii=False))
+                await websocket.close()
+                return
+            
+            role = room.assign_role()  # "opponent"または"spectator"
+            room.clients[websocket] = role
+    else:
+        # 「部屋を作る」モード：新しいルームを作成または既存ルームに接続
+        if not room_exists:
+            room = Room(room_id)
+            ROOMS[room_id] = room
+        else:
+            room = ROOMS[room_id]
+        
+        async with room.lock:
+            if len(room.clients) >= 2:
+                await websocket.send_text(json.dumps({"type": "error", "message": "このルームは既に満員です"}, ensure_ascii=False))
+                await websocket.close()
+                return
+            
+            role = room.assign_role()
+            room.clients[websocket] = role
 
     # 参加通知
     await websocket.send_text(json.dumps({"type": "hello", "roomId": room_id, "role": role}, ensure_ascii=False))
-    await room.broadcast({"type": "system", "message": f"{role} が参加しました"})
+    # 参加時のメッセージを役割で分岐
+    if role == "player":
+        await room.broadcast({"type": "system", "message": "接続待機中..."})
+    elif role == "opponent":
+        await room.broadcast({"type": "system", "message": "対戦相手が見つかりました"})
 
     # すぐstateを送る
     await websocket.send_text(json.dumps({"type": "state", "state": room.snapshot()}, ensure_ascii=False))
@@ -473,6 +513,11 @@ async def ws_room(websocket: WebSocket, room_id: str):
             typ = str(data.get("type", ""))
             if typ == "ping":
                 await websocket.send_text(json.dumps({"type": "pong"}, ensure_ascii=False))
+                continue
+
+            if typ == "battle-ready":
+                # 対戦準備完了を全員に通知
+                await room.broadcast({"type": "battle-ready"})
                 continue
 
             if typ == "action":

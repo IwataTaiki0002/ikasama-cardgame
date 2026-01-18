@@ -8,6 +8,100 @@ from typing import List, Optional, Dict, Any
 import time
 import random
 
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+import uvicorn
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+
+# FastAPIアプリ作成
+app = FastAPI()
+
+# ルーム管理
+rooms = {}
+
+# WebSocketエンドポイントのみ
+@app.websocket("/ws/{room_id}")
+async def websocket_endpoint(websocket: WebSocket, room_id: str):
+    await websocket.accept()
+    # ルーム管理
+    if room_id not in rooms:
+        rooms[room_id] = []
+    rooms[room_id].append(websocket)
+    role = "player" if len(rooms[room_id]) == 1 else "opponent"
+    try:
+        # 参加通知（helloメッセージ送信）
+        await websocket.send_text(f'{{"type": "hello", "roomId": "{room_id}", "role": "{role}"}}')
+        import json
+        if len(rooms[room_id]) == 2:
+            # 2人揃ったら両方にゲーム開始stateを送信（全WebSocketに送る）
+            state = GameLogic.create_initial_state()
+            state.started = True
+            state_msg = {
+                "type": "state",
+                "state": {
+                    "roomId": room_id,
+                    "started": True,
+                    "currentTurn": state.current_turn,
+                    "timer": state.timer,
+                    "isGameOver": state.is_game_over,
+                    "winner": state.winner,
+                    "player": state.player.__dict__,
+                    "opponent": state.opponent.__dict__,
+                    "cards": [c.__dict__ for c in state.cards],
+                    "cheatLog": []
+                }
+            }
+            # 1人目・2人目両方に送信
+            for ws in rooms[room_id]:
+                await ws.send_text(json.dumps(state_msg, ensure_ascii=False))
+        else:
+            # まだ1人ならstarted: false
+            state_msg = {
+                "type": "state",
+                "state": {
+                    "roomId": room_id,
+                    "started": False,
+                    "currentTurn": "player",
+                    "timer": 60,
+                    "isGameOver": False,
+                    "winner": None,
+                    "player": {
+                        "hp": 20, "mana": 3, "maxMana": 3, "hand": [], "field": [], "deck": 10, "penalty": 0
+                    },
+                    "opponent": {
+                        "hp": 20, "mana": 3, "maxMana": 3, "hand": [], "field": [], "deck": 10, "penalty": 0
+                    },
+                    "cards": [c.__dict__ for c in CARD_DB],
+                    "cheatLog": []
+                }
+            }
+            await websocket.send_text(json.dumps(state_msg, ensure_ascii=False))
+        while True:
+            data = await websocket.receive_text()
+            # 必要に応じて処理
+            await websocket.send_text(f"Echo: {data}")
+    except WebSocketDisconnect:
+        rooms[room_id].remove(websocket)
+        if not rooms[room_id]:
+            del rooms[room_id]
+
+
+# 先攻・後攻決定API
+@app.post("/api/first_attack")
+async def decide_first_attack():
+    import random
+    first = random.choice(["player", "opponent"])
+    return {"first": first}
+
+
+# ルートパスでindex.htmlを返す
+@app.get("/")
+async def root():
+    return FileResponse("static/index.html")
+
+# 静的ファイル配信（/static のみ）
+app.mount("/static", StaticFiles(directory="static", html=True), name="static")
+
 
 # =========================
 # 定数・設定
@@ -79,7 +173,6 @@ class GameState:
     
     player: PlayerState = dataclass_field(default_factory=PlayerState)
     opponent: PlayerState = dataclass_field(default_factory=PlayerState)
-    
     cards: List[Card] = dataclass_field(default_factory=lambda: CARD_DB.copy())
     cheat_log: List[CheatLogItem] = dataclass_field(default_factory=list)
 
@@ -327,24 +420,4 @@ class GameLogic:
 # 使用例
 # =========================
 if __name__ == "__main__":
-    # ゲーム状態を作成
-    game = GameLogic.create_initial_state()
-    GameLogic.start_game_offline(game)
-    
-    print("=== ゲーム開始 ===")
-    print(f"プレイヤーHP: {game.player.hp}, マナ: {game.player.mana}")
-    print(f"手札: {game.player.hand}")
-    print(f"場: {game.player.field}")
-    
-    # カードをプレイ
-    print("\n=== カードをプレイ ===")
-    GameLogic.play_card(game, 0)
-    print(f"プレイヤーマナ: {game.player.mana}")
-    print(f"手札: {game.player.hand}")
-    print(f"場: {game.player.field}")
-    
-    # ターン切り替え
-    print("\n=== ターン切り替え ===")
-    GameLogic.switch_turn(game)
-    print(f"現在のターン: {game.current_turn}")
-    print(f"プレイヤーHP: {game.player.hp}")
+    uvicorn.run(app, host="0.0.0.0", port=8000)
