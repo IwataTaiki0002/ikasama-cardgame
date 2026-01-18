@@ -19,29 +19,83 @@ document.addEventListener("DOMContentLoaded", () => {
   const findRoomBtn = document.getElementById("find-room-btn");
   if (createRoomBtn) {
     createRoomBtn.onclick = () => {
-      // ランダムなルームIDを生成して接続
+      // ...既存のオンライン処理...
       const roomId = "room-" + Math.random().toString(36).slice(2, 8);
-      connectWebSocket(roomId, "create"); // 部屋作成モード
-      // タイトル画面を非表示、接続パネルを表示
+      connectWebSocket(roomId, "create");
       const titleScreen = document.getElementById("title-screen");
       if (titleScreen) titleScreen.style.display = "none";
       const connectionPanel = document.getElementById("connection-panel");
       if (connectionPanel) connectionPanel.style.display = "block";
-      // ルームID入力欄を非表示
       const input = document.getElementById("room-id-input");
       const btn = document.getElementById("room-connect-btn");
       if (input) input.style.display = "none";
       if (btn) btn.style.display = "none";
-      // 生成したルームIDをラベルに表示
       const roomIdLabel = document.getElementById("room-id-label");
       const roomIdRow = document.getElementById("room-id-row");
       if (roomIdLabel) roomIdLabel.textContent = roomId;
       if (roomIdRow) roomIdRow.style.display = "block";
-      // ステータスを「接続待機中...」に明示的に表示
       const statusEl = document.getElementById("connection-status");
       if (statusEl) statusEl.textContent = "接続待機中...";
     };
   }
+
+  // === デバッグ用：通信なしで対戦画面に遷移 ===
+  // タイトル画面に「オフライン対戦画面へ」ボタンを追加
+  const debugBtn = document.createElement("button");
+  debugBtn.textContent = "オフライン対戦画面へ";
+  debugBtn.style.margin = "16px";
+  debugBtn.onclick = () => {
+    // タイトル画面を非表示、対戦画面を表示
+    const titleScreen = document.getElementById("title-screen");
+    const gameRoot = document.getElementById("game-root");
+    if (titleScreen) titleScreen.style.display = "none";
+    if (gameRoot) gameRoot.style.display = "block";
+    // 3D初期化＋ダミーstate描画
+    const container = document.getElementById("game-3d-container");
+    if (container) {
+      initThree(container);
+      const initialState = {
+        player: {
+          hand: [1, 2, 3],
+          field: [],
+          deck: 10,
+          hp: 20,
+          mana: 5,
+          grave: [],
+        },
+        opponent: {
+          hand: [4, 5, 6],
+          field: [],
+          deck: 10,
+          hp: 20,
+          mana: 5,
+          grave: [],
+        },
+        cards: [
+          { id: 1, name: "カードA", cost: 1, power: 2, toughness: 2 },
+          { id: 2, name: "カードB", cost: 2, power: 3, toughness: 3 },
+          { id: 3, name: "カードC", cost: 3, power: 4, toughness: 4 },
+          { id: 4, name: "カードD", cost: 1, power: 2, toughness: 2 },
+          { id: 5, name: "カードE", cost: 2, power: 3, toughness: 3 },
+          { id: 6, name: "カードF", cost: 3, power: 4, toughness: 4 },
+        ],
+      };
+      renderFromState(initialState, "player");
+    }
+    // カーソルも表示
+    const kbCursor = document.getElementById("kb-cursor");
+    if (kbCursor) {
+      kbCursor.style.display = "block";
+      if (gameRoot && kbCursor.parentNode !== gameRoot) {
+        gameRoot.appendChild(kbCursor);
+      }
+    }
+  };
+  // タイトル画面のボタン群に追加
+  const btnRow = document.querySelector(
+    ".title-screen > div[style*='display: flex']",
+  );
+  if (btnRow) btnRow.appendChild(debugBtn);
   if (findRoomBtn) {
     findRoomBtn.onclick = () => {
       // タイトル画面を非表示、接続パネルを表示
@@ -71,6 +125,13 @@ document.addEventListener("DOMContentLoaded", () => {
   let ws = null;
   let myRole = "player";
   let currentRoomId = "";
+  // 先攻後攻・マリガン・state管理用グローバル変数
+  let latestState = null;
+  let threeInitialized = false;
+  let firstAttackOrder = null; // "player" または "opponent"
+  let mulliganSelectedCards = [];
+  let mulliganDone = false;
+  let attackOrderShown = false;
 
   function connectWebSocket(roomId, mode = "create") {
     if (ws) ws.close();
@@ -103,23 +164,84 @@ document.addEventListener("DOMContentLoaded", () => {
             "対戦相手が見つかりました";
         }
       }
-      // 最新のstateを保持
-      let latestState = null;
-      let threeInitialized = false;
+      // （グローバル変数に移動済み）
+
+      // ...existing code...
       function transitionToBattle() {
         const connectionPanel = document.getElementById("connection-panel");
         const gameRoot = document.getElementById("game-root");
         if (connectionPanel) connectionPanel.style.display = "none";
         if (gameRoot) gameRoot.style.display = "block";
+        // 対戦画面でキーボードカーソルを表示
+        const kbCursor = document.getElementById("kb-cursor");
+        if (kbCursor) {
+          kbCursor.style.display = "block";
+          // 対戦画面ではgame-root直下に移動（z-indexや重なりの問題を回避）
+          const gameRoot = document.getElementById("game-root");
+          if (gameRoot && kbCursor.parentNode !== gameRoot) {
+            gameRoot.appendChild(kbCursor);
+          }
+        }
+        // 対戦画面ではマウス操作を無効化（必要ならpointer-events: none等も追加可）
+        // 3Dコンテナのマウスイベントを無効化したい場合は下記を有効化
+        // const container = document.getElementById("game-3d-container");
+        // if (container) container.style.pointerEvents = "none";
         const container = document.getElementById("game-3d-container");
         if (container && !threeInitialized) {
           initThree(container);
           threeInitialized = true;
         }
+        // 画面遷移直後にも先攻・後攻を必ず表示
+        if (firstAttackOrder) {
+          updateAttackOrderDisplay();
+        }
         // 以降はstate受信時にrenderFromStateのみ呼ぶ
+      }
+      function updateAttackOrderDisplay(state) {
+        if (attackOrderShown) return; // 既に表示済みなら何もしない
+        const playerOrderEl = document.getElementById("player-attack-order");
+        const opponentOrderEl = document.getElementById(
+          "opponent-attack-order",
+        );
+        if (playerOrderEl) playerOrderEl.style.display = "block";
+        if (opponentOrderEl) opponentOrderEl.style.display = "block";
+        if (playerOrderEl && opponentOrderEl && firstAttackOrder) {
+          attackOrderShown = true; // フラグを設定
+          // 自分のロールとfirstAttackRoleを比較して表示を分岐
+          const isMeFirst = myRole === firstAttackOrder;
+          if (isMeFirst) {
+            playerOrderEl.textContent = "先攻";
+            playerOrderEl.style.color = "#ff4444";
+            opponentOrderEl.textContent = "後攻";
+            opponentOrderEl.style.color = "#4466ff";
+          } else {
+            playerOrderEl.textContent = "後攻";
+            playerOrderEl.style.color = "#4466ff";
+            opponentOrderEl.textContent = "先攻";
+            opponentOrderEl.style.color = "#ff4444";
+          }
+          // 3秒後に自動で非表示し、マリガンUIを表示
+          setTimeout(() => {
+            if (playerOrderEl) playerOrderEl.style.display = "none";
+            if (opponentOrderEl) opponentOrderEl.style.display = "none";
+            // マリガンUIを表示
+            showMulliganUI(state);
+          }, 3000);
+        }
       }
       if (msg.type === "state" && msg.state) {
         latestState = msg.state;
+        // サーバーstateから先攻・後攻を取得（初回のみ表示）
+        if (msg.state.firstAttackRole && !attackOrderShown) {
+          firstAttackOrder = msg.state.firstAttackRole;
+          updateAttackOrderDisplay(msg.state);
+        }
+        // マリガンフェーズの処理
+        if (msg.state.isMulliganPhase) {
+          updateMulliganUI(msg.state);
+        } else {
+          hideMulliganUI();
+        }
         // デバッグ: 受信stateの中身を確認
         console.log("state.player", latestState.player);
         console.log("state.opponent", latestState.opponent);
@@ -132,7 +254,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         // 通信相手が見つかったらUI表示
         if (msg.state.started) {
-          showOpponentFoundUI();
+          if (typeof showOpponentFoundUI === "function") showOpponentFoundUI();
         } else {
           // started: falseなら待機画面のまま
           // 必要なら「接続待機中」など表示
@@ -207,6 +329,146 @@ document.addEventListener("DOMContentLoaded", () => {
     connectionPanel.appendChild(input);
     connectionPanel.appendChild(btn);
   }
+
+  // マリガンUI関連関数
+  function showMulliganUI(state) {
+    if (!state || !state.isMulliganPhase) return;
+    latestState = state;
+    const mulliganPanel = document.getElementById("mulligan-panel");
+    if (mulliganPanel) {
+      mulliganPanel.style.display = "block";
+      updateMulliganHand();
+      setupMulliganEvents();
+    }
+  }
+
+  function hideMulliganUI() {
+    const mulliganPanel = document.getElementById("mulligan-panel");
+    if (mulliganPanel) {
+      mulliganPanel.style.display = "none";
+    }
+  }
+
+  function updateMulliganUI(state) {
+    // タイマー更新
+    const timerEl = document.getElementById("mulligan-timer");
+    if (timerEl) {
+      timerEl.textContent = `残り時間: ${state.mulliganTimer}秒`;
+      if (state.mulliganTimer <= 3) {
+        timerEl.style.color = "#ff0000";
+      } else if (state.mulliganTimer <= 5) {
+        timerEl.style.color = "#ff8800";
+      } else {
+        timerEl.style.color = "#ff4444";
+      }
+    }
+  }
+
+  function updateMulliganHand() {
+    if (!latestState || !latestState.player) return;
+
+    const handEl = document.getElementById("mulligan-hand");
+    if (!handEl) return;
+
+    handEl.innerHTML = "";
+    mulliganSelectedCards = [];
+
+    latestState.player.hand.forEach((cardId, index) => {
+      const card = latestState.cards.find((c) => c.id === cardId);
+      if (!card) return;
+
+      const cardEl = document.createElement("div");
+      cardEl.className = "mulligan-card";
+      cardEl.style.cssText = `
+        width: 80px;
+        height: 110px;
+        background: linear-gradient(135deg, #333, #555);
+        border: 2px solid #666;
+        border-radius: 8px;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        padding: 8px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        font-size: 0.8em;
+      `;
+
+      cardEl.innerHTML = `
+        <div style="font-weight: bold; text-align: center;">${card.name}</div>
+        <div style="text-align: center;">
+          <div>コスト: ${card.cost}</div>
+          <div>${card.power}/${card.toughness}</div>
+        </div>
+      `;
+
+      cardEl.onclick = () => toggleMulliganCard(index, cardEl);
+      handEl.appendChild(cardEl);
+    });
+  }
+
+  function toggleMulliganCard(index, cardEl) {
+    const isSelected = mulliganSelectedCards.includes(index);
+
+    if (isSelected) {
+      // 選択解除
+      mulliganSelectedCards = mulliganSelectedCards.filter((i) => i !== index);
+      cardEl.style.border = "2px solid #666";
+      cardEl.style.transform = "scale(1)";
+      cardEl.style.backgroundColor = "linear-gradient(135deg, #333, #555)";
+    } else {
+      // 選択
+      mulliganSelectedCards.push(index);
+      cardEl.style.border = "3px solid #ff4444";
+      cardEl.style.transform = "scale(1.1)";
+      cardEl.style.background = "linear-gradient(135deg, #554433, #776655)";
+    }
+  }
+
+  function setupMulliganEvents() {
+    const confirmBtn = document.getElementById("mulligan-confirm");
+    const skipBtn = document.getElementById("mulligan-skip");
+
+    if (confirmBtn) {
+      confirmBtn.onclick = () => {
+        if (mulliganDone) return;
+        mulliganDone = true;
+
+        if (ws) {
+          ws.send(
+            JSON.stringify({
+              type: "action",
+              action: "mulligan",
+              payload: {
+                cardIndices: mulliganSelectedCards,
+              },
+            }),
+          );
+        }
+      };
+    }
+
+    if (skipBtn) {
+      skipBtn.onclick = () => {
+        if (mulliganDone) return;
+        mulliganDone = true;
+
+        if (ws) {
+          ws.send(
+            JSON.stringify({
+              type: "action",
+              action: "mulligan",
+              payload: {
+                cardIndices: [],
+              },
+            }),
+          );
+        }
+      };
+    }
+  }
+
   console.log("main.js loaded");
 
   // タイトル・ゲーム画面のDOM取得
@@ -293,11 +555,13 @@ document.addEventListener("DOMContentLoaded", () => {
   titleCursorY = center.y;
   updateTitleCursor();
 
-  // タイトル画面のキーボード操作
+  // タイトル画面・対戦画面のキーボード操作
   document.addEventListener("keydown", (e) => {
-    // タイトル画面が表示中のみカーソル移動
-    if (titleScreen && titleScreen.style.display !== "none") {
-      const k = e.key;
+    const k = e.key;
+    // タイトル画面 or 対戦画面が表示中のみカーソル移動
+    const isTitle = titleScreen && titleScreen.style.display !== "none";
+    const isBattle = gameRoot && gameRoot.style.display !== "none";
+    if (isTitle || isBattle) {
       if (k === "ArrowLeft") {
         e.preventDefault();
         keys.left = true;
@@ -318,29 +582,30 @@ document.addEventListener("DOMContentLoaded", () => {
         keys.down = true;
         startMoveLoop();
       }
-      // Z/Enter/Spaceでスタート
+      // Z/Enter/Spaceで決定
       if (k.toLowerCase() === "z" || k === "Enter" || k === " ") {
-        console.log("Start key pressed!");
         e.preventDefault();
-        // カーソルがボタン上なら遷移
-        if (!startButton) {
-          console.error("startButton not found");
-          return;
-        }
-        const rect = startButton.getBoundingClientRect();
-        console.log("cursor:", titleCursorX, titleCursorY);
-        console.log("button rect:", rect);
-        if (
-          titleCursorX >= rect.left &&
-          titleCursorX <= rect.right &&
-          titleCursorY >= rect.top &&
-          titleCursorY <= rect.bottom
-        ) {
-          console.log("Starting transition!");
-          beginTransition();
-        } else {
-          console.log("Cursor not on button - forcing transition anyway");
-          beginTransition();
+        if (isTitle) {
+          // タイトル画面：カーソルがボタン上なら遷移
+          if (!startButton) {
+            console.error("startButton not found");
+            return;
+          }
+          const rect = startButton.getBoundingClientRect();
+          if (
+            titleCursorX >= rect.left &&
+            titleCursorX <= rect.right &&
+            titleCursorY >= rect.top &&
+            titleCursorY <= rect.bottom
+          ) {
+            beginTransition();
+          } else {
+            beginTransition();
+          }
+        } else if (isBattle) {
+          // 対戦画面：ここにZキー等のアクション処理を追加（必要に応じて）
+          // 例: カード選択やメニュー表示など
+          // console.log("Battle Z/Enter pressed");
         }
       }
     }
@@ -364,6 +629,13 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // タイトル→ゲーム画面への遷移・暗転・ゲーム開始
+  // タイトル画面に戻るときはカーソルを非表示にする
+  function showTitleScreen() {
+    if (titleScreen) titleScreen.style.display = "flex";
+    if (gameRoot) gameRoot.style.display = "none";
+    const kbCursor = document.getElementById("kb-cursor");
+    if (kbCursor) kbCursor.style.display = "block";
+  }
   function beginTransition() {
     if (titleScreen) titleScreen.style.display = "none";
     if (gameRoot) gameRoot.style.display = "none";

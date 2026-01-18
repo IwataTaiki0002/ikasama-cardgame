@@ -67,6 +67,14 @@ class GameState:
     isGameOver: bool = False
     winner: Optional[str] = None  # "player"/"opponent"/None
     timer: int = TURN_SECONDS
+    
+    # マリガンフェーズ
+    isMulliganPhase: bool = False
+    mulliganTimer: int = 10
+    playerMulliganDone: bool = False
+    opponentMulliganDone: bool = False
+    playerMulliganCards: List[int] = field(default_factory=list)  # 戻すカードのインデックス
+    opponentMulliganCards: List[int] = field(default_factory=list)
 
     player: PlayerState = field(default_factory=PlayerState)
     opponent: PlayerState = field(default_factory=PlayerState)
@@ -85,6 +93,7 @@ class Room:
         self.lock = asyncio.Lock()
         self.loop_task: Optional[asyncio.Task] = None
         self.started = False
+        self.first_attack_role: Optional[str] = None  # "player" or "opponent"
 
     def roles_in_use(self) -> Set[str]:
         return set(self.clients.values())
@@ -124,10 +133,15 @@ class Room:
             "timer": s.timer,
             "isGameOver": s.isGameOver,
             "winner": s.winner,
+            "isMulliganPhase": s.isMulliganPhase,
+            "mulliganTimer": s.mulliganTimer,
+            "playerMulliganDone": s.playerMulliganDone,
+            "opponentMulliganDone": s.opponentMulliganDone,
             "player": player_view(s.player),
             "opponent": player_view(s.opponent),
             "cards": [asdict(c) for c in CARD_DB],
             "cheatLog": cheat_log,
+            "firstAttackRole": self.first_attack_role,
         }
 
     async def broadcast(self, data: Dict[str, Any]) -> None:
@@ -156,9 +170,18 @@ class Room:
                     if self.state.isGameOver:
                         continue
 
-                    self.state.timer -= 1
-                    if self.state.timer <= 0:
-                        await self._switch_turn_locked()
+                    # マリガンフェーズの処理
+                    if self.state.isMulliganPhase:
+                        self.state.mulliganTimer -= 1
+                        if self.state.mulliganTimer <= 0:
+                            await self._execute_mulligan_locked()
+                        elif self.state.playerMulliganDone and self.state.opponentMulliganDone:
+                            await self._execute_mulligan_locked()
+                    else:
+                        # 通常のターンタイマー
+                        self.state.timer -= 1
+                        if self.state.timer <= 0:
+                            await self._switch_turn_locked()
 
                     snap = self.snapshot()
 
@@ -169,6 +192,7 @@ class Room:
     async def start_game_locked(self) -> None:
         if self.started:
             return
+        import random
         self.started = True
         self.state.isGameOver = False
         self.state.winner = None
@@ -176,9 +200,21 @@ class Room:
         self.state.timer = TURN_SECONDS
         self.state.cheatLog.clear()
 
+        # 先攻・後攻は部屋作成者（player1）が決定し、既に決まっていれば再利用
+        if self.first_attack_role is None:
+            self.first_attack_role = random.choice(["player", "opponent"])
+
         # 初期手札（3枚）
         self.state.player.hand = [c.id for c in CARD_DB[:3]]
         self.state.opponent.hand = [c.id for c in CARD_DB[:3]]
+        
+        # マリガンフェーズを開始
+        self.state.isMulliganPhase = True
+        self.state.mulliganTimer = 10
+        self.state.playerMulliganDone = False
+        self.state.opponentMulliganDone = False
+        self.state.playerMulliganCards.clear()
+        self.state.opponentMulliganCards.clear()
 
     async def _switch_turn_locked(self) -> None:
         s = self.state
@@ -248,6 +284,10 @@ class Room:
             # 指摘
             if action == "accuse":
                 return self._action_accuse_locked(role, payload)
+
+            # マリガン
+            if action == "mulligan":
+                return self._action_mulligan_locked(role, payload)
 
             return False, f"不明なaction: {action}"
 
@@ -420,6 +460,68 @@ class Room:
         self._end_game_if_needed_locked()
         return True, "accuse success (enemy penalty +1)"
 
+    def _action_mulligan_locked(self, role: str, payload: Dict[str, Any]) -> Tuple[bool, str]:
+        """マリガン選択を受け付ける"""
+        if not self.state.isMulliganPhase:
+            return False, "マリガンフェーズではありません"
+            
+        if (role == "player" and self.state.playerMulliganDone) or \
+           (role == "opponent" and self.state.opponentMulliganDone):
+            return False, "既にマリガンは完了しています"
+            
+        card_indices = payload.get("cardIndices", [])
+        if not isinstance(card_indices, list):
+            return False, "cardIndicesは配列である必要があります"
+            
+        ps = self._get_ps(role)
+        # インデックスの有効性チェック
+        for idx in card_indices:
+            if not isinstance(idx, int) or idx < 0 or idx >= len(ps.hand):
+                return False, f"無効なカードインデックス: {idx}"
+                
+        # マリガン情報を保存
+        if role == "player":
+            self.state.playerMulliganCards = card_indices[:]
+            self.state.playerMulliganDone = True
+        else:
+            self.state.opponentMulliganCards = card_indices[:]
+            self.state.opponentMulliganDone = True
+            
+        return True, f"マリガン選択完了: {len(card_indices)}枚"
+        
+    async def _execute_mulligan_locked(self) -> None:
+        """マリガンを実行する"""
+        if not self.state.isMulliganPhase:
+            return
+            
+        # プレイヤーのマリガン実行
+        if self.state.playerMulliganCards:
+            # 降順でソートして後ろから削除（インデックスずれを防ぐ）
+            for idx in sorted(self.state.playerMulliganCards, reverse=True):
+                if 0 <= idx < len(self.state.player.hand):
+                    self.state.player.hand.pop(idx)
+            # 削除した枚数分ドロー
+            draw_count = len(self.state.playerMulliganCards)
+            for _ in range(draw_count):
+                if len(CARD_DB) > 0:
+                    new_card = CARD_DB[int(time.time() * 1.1) % len(CARD_DB)]
+                    self.state.player.hand.append(new_card.id)
+                    
+        # 相手のマリガン実行
+        if self.state.opponentMulliganCards:
+            for idx in sorted(self.state.opponentMulliganCards, reverse=True):
+                if 0 <= idx < len(self.state.opponent.hand):
+                    self.state.opponent.hand.pop(idx)
+            draw_count = len(self.state.opponentMulliganCards)
+            for _ in range(draw_count):
+                if len(CARD_DB) > 0:
+                    new_card = CARD_DB[int(time.time() * 1.3) % len(CARD_DB)]
+                    self.state.opponent.hand.append(new_card.id)
+                    
+        # マリガンフェーズ終了
+        self.state.isMulliganPhase = False
+        self.state.timer = TURN_SECONDS  # 通常ターンタイマーに戻す
+
 
 ROOMS: Dict[str, Room] = {}
 
@@ -497,6 +599,10 @@ async def ws_room(websocket: WebSocket, room_id: str, mode: str = "create"):
         await room.broadcast({"type": "system", "message": "接続待機中..."})
     elif role == "opponent":
         await room.broadcast({"type": "system", "message": "対戦相手が見つかりました"})
+
+    # 2人揃ったら自動でゲーム開始
+    if len(room.clients) == 2 and not room.started:
+        await room.handle_action("player", "start", {})
 
     # すぐstateを送る
     await websocket.send_text(json.dumps({"type": "state", "state": room.snapshot()}, ensure_ascii=False))

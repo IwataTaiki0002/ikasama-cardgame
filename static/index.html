@@ -168,11 +168,49 @@
           position: absolute;
           top: 0;
           left: 0;
-          width: 100%;
-          height: 100%;
-          z-index: 1;
+          width: 100vw;
+          height: 100vh;
+          z-index: 10;
+          background: transparent;
+          pointer-events: auto;
+          display: block;
         "
       ></div>
+      <!-- 山札・体力・マナ表示領域 -->
+      <div class="player-status" id="player-status">
+        <div class="deck-area">
+          <span>山札：</span><span id="player-deck">10</span>
+        </div>
+        <div class="cylinder-area">
+          <div class="cylinder health">
+            <span>体力</span>
+            <div class="cylinder-bar" id="player-hp-bar"></div>
+            <span id="player-hp">20</span>
+          </div>
+          <div class="cylinder mana">
+            <span>マナ</span>
+            <div class="cylinder-bar" id="player-mana-bar"></div>
+            <span id="player-mana">5</span>
+          </div>
+        </div>
+      </div>
+      <div class="opponent-status" id="opponent-status">
+        <div class="deck-area">
+          <span>山札：</span><span id="opponent-deck">10</span>
+        </div>
+        <div class="cylinder-area">
+          <div class="cylinder health">
+            <span>体力</span>
+            <div class="cylinder-bar" id="opponent-hp-bar"></div>
+            <span id="opponent-hp">20</span>
+          </div>
+          <div class="cylinder mana">
+            <span>マナ</span>
+            <div class="cylinder-bar" id="opponent-mana-bar"></div>
+            <span id="opponent-mana">5</span>
+          </div>
+        </div>
+      </div>
       <!-- UI・ヘルプ・パネル等は元のindex.htmlのまま -->
       <div class="help-overlay">
         <div class="help-title">操作（キーボード限定）</div>
@@ -183,6 +221,82 @@
         <div class="help-line"><b>X</b>：キャンセル（メニュー閉じる）</div>
         <div class="help-line"><b>C</b>：指摘（Accuse）</div>
       </div>
+      <!-- 3D Canvas -->
+      <div
+        id="game-3d-container"
+        style="
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100vw;
+          height: 100vh;
+          z-index: 10;
+          background: transparent;
+          pointer-events: auto;
+          display: block;
+        "
+      ></div>
+      <!-- 先攻・後攻表示（画面全体の中央上・中央下） -->
+      <div id="opponent-attack-order" style="position: fixed; top: 22%; left: 50%; transform: translateX(-50%); font-size: 1.8em; color: #fff; background: rgba(0, 0, 0, 0.75); border: 2px solid #ffaa00; border-radius: 12px; padding: 12px 32px; z-index: 100; text-align: center; font-weight: bold; letter-spacing: 2px; display: none;">先攻</div>
+      <div id="player-attack-order" style="position: fixed; bottom: 22%; left: 50%; transform: translateX(-50%); font-size: 1.8em; color: #fff; background: rgba(0, 0, 0, 0.75); border: 2px solid #ffaa00; border-radius: 12px; padding: 12px 32px; z-index: 100; text-align: center; font-weight: bold; letter-spacing: 2px; display: none;">後攻</div>
+      
+      <!-- マリガンUI -->
+      <div id="mulligan-panel" style="
+        display: none;
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-width: 800px;
+        height: 60%;
+        background: rgba(0, 0, 0, 0.95);
+        border: 3px solid #ffaa00;
+        border-radius: 20px;
+        z-index: 200;
+        padding: 30px;
+        text-align: center;
+        color: #fff;
+      ">
+        <h2 style="margin-top: 0; color: #ffaa00;">マリガン - 手札を選んで引き直し</h2>
+        <div id="mulligan-timer" style="font-size: 2em; margin: 20px 0; color: #ff4444;">残り時間: 10秒</div>
+        <div style="margin: 20px 0;">
+          <p>山札に戻したいカードをクリックで選択し、「確定」ボタンを押してください</p>
+          <p>選んだカードの枚数分、新しいカードを引きます</p>
+        </div>
+        <div id="mulligan-hand" style="
+          display: flex;
+          justify-content: center;
+          gap: 15px;
+          margin: 30px 0;
+          flex-wrap: wrap;
+        ">
+          <!-- 手札カードが動的に追加される -->
+        </div>
+        <div style="margin-top: 30px;">
+          <button id="mulligan-confirm" style="
+            font-size: 1.5em;
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            margin-right: 20px;
+          ">確定</button>
+          <button id="mulligan-skip" style="
+            font-size: 1.5em;
+            padding: 15px 40px;
+            background: linear-gradient(135deg, #666, #555);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+          ">スキップ</button>
+        </div>
+      </div>
+      <!-- 山札・体力・マナ表示領域 -->
+      <!-- 山札・体力・マナ表示領域 -->
       <div class="game-ui-overlay">
         <div class="ui-layer">
           <div class="center-panel">
@@ -194,9 +308,7 @@
             <div class="turn-label" id="opponent-turn-label">相手のターン</div>
             <div class="timer" id="timer">60</div>
             <div class="turn-label" id="player-turn-label">あなたのターン</div>
-            <div
-              id="first-attack-indicator"
-              style="
+            <div id="first-attack-indicator" style="
                 display: none;
                 font-size: 2.2em;
                 color: #fff;
@@ -205,6 +317,24 @@
                 border-radius: 16px;
                 padding: 32px 48px;
                 position: fixed;
+                left: 50%;
+                top: 50%;
+                transform: translate(-50%, -50%);
+                z-index: 3000;
+                text-align: center;
+                font-weight: bold;
+                letter-spacing: 2px;
+                box-shadow: 0 0 32px #ffaa00;
+                pointer-events: none;
+              "></div>
+            <div class="penalty-row" id="penalty-player">
+              <div class="penalty-card"></div>
+              <div class="penalty-card"></div>
+              <div class="penalty-card"></div>
+            </div>
+          </div>
+        </div>
+      </div>
                 left: 50%;
                 top: 50%;
                 transform: translate(-50%, -50%);

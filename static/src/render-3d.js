@@ -404,8 +404,12 @@ function updateDecks(playerDeckCount, opponentDeckCount) {
   safeRemove(deckGroupOpponent);
 
   // ※あなたの現状座標（このまま）
-  deckGroupPlayer = buildDeckStack(pCount, new THREE.Vector3(8.4, 0.1, 4.2));
-  deckGroupOpponent = buildDeckStack(oCount, new THREE.Vector3(-8, 0.1, -4));
+  deckGroupPlayer = buildDeckStack(pCount, new THREE.Vector3(8, 1.0, 5.5));
+  // 左上＋微調整: x=-7.5, z=-3.5
+  deckGroupOpponent = buildDeckStack(
+    oCount,
+    new THREE.Vector3(-7.5, 1.0, -3.5),
+  );
 
   scene.add(deckGroupPlayer);
   scene.add(deckGroupOpponent);
@@ -474,17 +478,22 @@ function updateChips(player, opponent) {
   safeRemove(chips.opponent.mana);
   safeRemove(chips.opponent.hp);
 
+  // 体力・マナの円柱チップも中央付近に寄せる
+  // 体力の少し上、左揃え（x=-4.4, z=6.0）
+  // 体力の少し上、左揃え（x=-4.4, z=5.8）
+  // 体力の少し上、左揃え（x=-4.1, z=5.8）
   chips.player.mana = buildChipRow(
     player?.mana ?? 0,
     MAX_MANA_TOKENS,
     "mana",
-    new THREE.Vector3(-4.3, 0.1, 5.45),
+    new THREE.Vector3(-4.1, 1.0, 5.8),
     +1,
   );
+  // 手前の白線（P_HPゾーン: x=0.4, z=7.4）に合わせて配置
   chips.player.hp = buildHpGrid(
     player?.hp ?? 0,
     MAX_HP_TOKENS,
-    new THREE.Vector3(-4.3, 0.1, 7.0),
+    new THREE.Vector3(-4.4, 1.0, 7.2),
     +1,
   );
 
@@ -492,13 +501,13 @@ function updateChips(player, opponent) {
     opponent?.mana ?? 0,
     MAX_MANA_TOKENS,
     "mana",
-    new THREE.Vector3(2.9, 0.1, -5.0),
+    new THREE.Vector3(0, 1.0, -1.2),
     +1,
   );
   chips.opponent.hp = buildHpGrid(
     opponent?.hp ?? 0,
     MAX_HP_TOKENS,
-    new THREE.Vector3(5.0, 0.1, -6.6),
+    new THREE.Vector3(0, 1.0, -2.2),
     -1,
   );
 
