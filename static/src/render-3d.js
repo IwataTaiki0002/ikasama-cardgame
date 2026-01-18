@@ -3,10 +3,10 @@ let scene, camera, renderer, raycaster, mouse;
 let rafId = null;
 
 let input = {
-  onPlayCard: null,      // handIndex
-  onOpenCheat: null,     // x,y
+  onPlayCard: null, // handIndex
+  onOpenCheat: null, // x,y
   onAccuse: null,
-  onCursorAction: null,  // (hitInfo) -> main.jsが解釈する
+  onCursorAction: null, // (hitInfo) -> main.jsが解釈する
 };
 
 let cardMeshes = [];
@@ -42,11 +42,15 @@ const GRAVE_SHOW_MAX = 5;
 
 // ===== util =====
 function clearMeshes(arr) {
-  arr.forEach(m => scene.remove(m));
+  arr.forEach((m) => scene.remove(m));
   arr.length = 0;
 }
-function safeRemove(obj) { if (obj) scene.remove(obj); }
-function clamp(n, min, max) { return Math.max(min, Math.min(max, n)); }
+function safeRemove(obj) {
+  if (obj) scene.remove(obj);
+}
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
 
 // ===== カード描画（CanvasTexture） =====
 function makeCardTexture(card, faceUp) {
@@ -102,7 +106,11 @@ function makeCardTexture(card, faceUp) {
 
     ctx.fillStyle = "#4ecdc4";
     ctx.textAlign = "right";
-    ctx.fillText(String(card?.toughness ?? 0), canvas.width - 50, canvas.height - 60);
+    ctx.fillText(
+      String(card?.toughness ?? 0),
+      canvas.width - 50,
+      canvas.height - 60,
+    );
   }
 
   const tex = new THREE.CanvasTexture(canvas);
@@ -145,13 +153,21 @@ function createTable() {
   tableGroup = new THREE.Group();
 
   const tableGeo = new THREE.BoxGeometry(22, 0.5, 18);
-  const tableMat = new THREE.MeshStandardMaterial({ color: 0x2d5a2d, roughness: 0.85, metalness: 0.0 });
+  const tableMat = new THREE.MeshStandardMaterial({
+    color: 0x2d5a2d,
+    roughness: 0.85,
+    metalness: 0.0,
+  });
   const table = new THREE.Mesh(tableGeo, tableMat);
   table.position.y = -0.5;
   tableGroup.add(table);
 
   const edgeGeo = new THREE.BoxGeometry(23, 1, 19);
-  const edgeMat = new THREE.MeshStandardMaterial({ color: 0x5c3d2e, roughness: 0.6, metalness: 0.25 });
+  const edgeMat = new THREE.MeshStandardMaterial({
+    color: 0x5c3d2e,
+    roughness: 0.6,
+    metalness: 0.25,
+  });
   const edge = new THREE.Mesh(edgeGeo, edgeMat);
   edge.position.y = -1;
   tableGroup.add(edge);
@@ -203,19 +219,61 @@ function createZones() {
   zoneGroup = new THREE.Group();
 
   // ===== プレイヤー側 =====
-  addZoneRect("P_MANA", new THREE.Vector3(0.4, ZONE_Y, 5.35), 11.7, 1.6, 0xffffff);
-  addZoneRect("P_HP",   new THREE.Vector3(0.4, ZONE_Y, 7.4),  11.7, 2.5, 0xffffff);
+  addZoneRect(
+    "P_MANA",
+    new THREE.Vector3(0.4, ZONE_Y, 5.35),
+    11.7,
+    1.6,
+    0xffffff,
+  );
+  addZoneRect("P_HP", new THREE.Vector3(0.4, ZONE_Y, 7.4), 11.7, 2.5, 0xffffff);
 
   // ※ここはあなたの現状コードのまま（枠の場所）
-  addZoneRect("P_DECK",  new THREE.Vector3(9.0, ZONE_Y,  6.0), 3.4, 5.0, 0xffffff);
-  addZoneRect("P_GRAVE", new THREE.Vector3(6.0, ZONE_Y,  6.0), 3.4, 5.0, 0xffffff);
+  addZoneRect(
+    "P_DECK",
+    new THREE.Vector3(9.0, ZONE_Y, 6.0),
+    3.4,
+    5.0,
+    0xffffff,
+  );
+  addZoneRect(
+    "P_GRAVE",
+    new THREE.Vector3(6.0, ZONE_Y, 6.0),
+    3.4,
+    5.0,
+    0xffffff,
+  );
 
   // ===== 相手側 =====
-  addZoneRect("O_MANA", new THREE.Vector3(7.4, ZONE_Y, -5.0), 12.5, 1.8, 0xffffff);
-  addZoneRect("O_HP",   new THREE.Vector3(0.8, ZONE_Y, -6.15), 12.8, 3.2, 0xffffff);
+  addZoneRect(
+    "O_MANA",
+    new THREE.Vector3(7.4, ZONE_Y, -5.0),
+    12.5,
+    1.8,
+    0xffffff,
+  );
+  addZoneRect(
+    "O_HP",
+    new THREE.Vector3(0.8, ZONE_Y, -6.15),
+    12.8,
+    3.2,
+    0xffffff,
+  );
 
-  addZoneRect("O_DECK",  new THREE.Vector3(9.0, ZONE_Y, -6.0), 3.4, 4.2, 0xffffff);
-  addZoneRect("O_GRAVE", new THREE.Vector3(6.0, ZONE_Y, -6.0), 3.4, 4.2, 0xffffff);
+  addZoneRect(
+    "O_DECK",
+    new THREE.Vector3(9.0, ZONE_Y, -6.0),
+    3.4,
+    4.2,
+    0xffffff,
+  );
+  addZoneRect(
+    "O_GRAVE",
+    new THREE.Vector3(6.0, ZONE_Y, -6.0),
+    3.4,
+    4.2,
+    0xffffff,
+  );
 
   scene.add(zoneGroup);
 }
@@ -242,7 +300,12 @@ function buildGraveStack(cardIds, cardsById, centerPos, faceUp = true) {
 
   for (let i = 0; i < list.length; i++) {
     const cid = list[i];
-    const card = cardsById.get(cid) || { name: "?", cost: 0, power: 0, toughness: 0 };
+    const card = cardsById.get(cid) || {
+      name: "?",
+      cost: 0,
+      power: 0,
+      toughness: 0,
+    };
 
     const mesh = createCardMesh(card, faceUp);
 
@@ -258,10 +321,14 @@ function buildGraveStack(cardIds, cardsById, centerPos, faceUp = true) {
     mesh.position.set(centerPos.x + dx, baseY + dy, centerPos.z + dz);
 
     // 少し回転させる（固定パターンで揺れない）
-    const rot = (i % 2 === 0) ? 0.03 : -0.03;
+    const rot = i % 2 === 0 ? 0.03 : -0.03;
     mesh.rotation.z = rot;
 
-    mesh.userData = { kind: "grave", index: (cardIds.length - list.length + i), cardId: cid };
+    mesh.userData = {
+      kind: "grave",
+      index: cardIds.length - list.length + i,
+      cardId: cid,
+    };
     group.add(mesh);
   }
 
@@ -327,7 +394,8 @@ function updateDecks(playerDeckCount, opponentDeckCount) {
   const oCount = opponentDeckCount ?? 10;
 
   // ✅ 枚数が変わらないなら再生成しない（見た目が揺れない）
-  if (lastDeckCountPlayer === pCount && lastDeckCountOpponent === oCount) return;
+  if (lastDeckCountPlayer === pCount && lastDeckCountOpponent === oCount)
+    return;
 
   lastDeckCountPlayer = pCount;
   lastDeckCountOpponent = oCount;
@@ -392,7 +460,7 @@ function buildHpGrid(count, maxCount, basePos, direction = 1) {
     const row = Math.floor(i / 10);
     const col = i % 10;
     chip.position.x = direction * (col * 1.0 + row * 0.5);
-    chip.position.z = direction === 1 ? (row * 1.0) : -(row * 1.0);
+    chip.position.z = direction === 1 ? row * 1.0 : -(row * 1.0);
     chip.position.y = 0.06;
     chip.visible = i < c;
     group.add(chip);
@@ -406,11 +474,33 @@ function updateChips(player, opponent) {
   safeRemove(chips.opponent.mana);
   safeRemove(chips.opponent.hp);
 
-  chips.player.mana = buildChipRow(player?.mana ?? 0, MAX_MANA_TOKENS, "mana", new THREE.Vector3(-4.3, 0.1, 5.45), +1);
-  chips.player.hp = buildHpGrid(player?.hp ?? 0, MAX_HP_TOKENS, new THREE.Vector3(-4.3, 0.1, 7.0), +1);
+  chips.player.mana = buildChipRow(
+    player?.mana ?? 0,
+    MAX_MANA_TOKENS,
+    "mana",
+    new THREE.Vector3(-4.3, 0.1, 5.45),
+    +1,
+  );
+  chips.player.hp = buildHpGrid(
+    player?.hp ?? 0,
+    MAX_HP_TOKENS,
+    new THREE.Vector3(-4.3, 0.1, 7.0),
+    +1,
+  );
 
-  chips.opponent.mana = buildChipRow(opponent?.mana ?? 0, MAX_MANA_TOKENS, "mana", new THREE.Vector3(2.9, 0.1, -5.0), +1);
-  chips.opponent.hp = buildHpGrid(opponent?.hp ?? 0, MAX_HP_TOKENS, new THREE.Vector3(5.0, 0.1, -6.6), -1);
+  chips.opponent.mana = buildChipRow(
+    opponent?.mana ?? 0,
+    MAX_MANA_TOKENS,
+    "mana",
+    new THREE.Vector3(2.9, 0.1, -5.0),
+    +1,
+  );
+  chips.opponent.hp = buildHpGrid(
+    opponent?.hp ?? 0,
+    MAX_HP_TOKENS,
+    new THREE.Vector3(5.0, 0.1, -6.6),
+    -1,
+  );
 
   scene.add(chips.player.mana);
   scene.add(chips.player.hp);
@@ -438,7 +528,12 @@ function hitTestAtScreen(screenX, screenY) {
   mouse.y = ny;
   raycaster.setFromCamera(mouse, camera);
 
-  const targets = [...cardMeshes, ...myFieldMeshes, ...oppFieldMeshes, ...oppCardMeshes];
+  const targets = [
+    ...cardMeshes,
+    ...myFieldMeshes,
+    ...oppFieldMeshes,
+    ...oppCardMeshes,
+  ];
   const hits = raycaster.intersectObjects(targets, true);
   if (!hits.length) return null;
 
@@ -472,7 +567,12 @@ function initThree(container) {
   scene = new THREE.Scene();
   scene.background = new THREE.Color(0x1a1a2e);
 
-  camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera = new THREE.PerspectiveCamera(
+    60,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000,
+  );
   camera.position.set(0, 14.8, 11.4);
   camera.lookAt(0, 0, 3);
 
@@ -491,11 +591,6 @@ function initThree(container) {
 
   window.addEventListener("resize", onResize);
 
-  window.addEventListener("contextmenu", (e) => {
-    e.preventDefault();
-    input.onOpenCheat?.(e.clientX, e.clientY);
-  });
-
   const loop = () => {
     rafId = requestAnimationFrame(loop);
     renderer.render(scene, camera);
@@ -511,7 +606,7 @@ function renderFromState(state, myRole) {
   if (!scene) return;
 
   const cardsById = new Map();
-  (state.cards || []).forEach(c => cardsById.set(c.id, c));
+  (state.cards || []).forEach((c) => cardsById.set(c.id, c));
 
   const me = myRole === "opponent" ? state.opponent : state.player;
   const enemy = myRole === "opponent" ? state.player : state.opponent;
@@ -534,7 +629,12 @@ function renderFromState(state, myRole) {
   // 自分手札
   const startX = -((me.hand.length - 1) * spacing) / 2;
   me.hand.forEach((cid, i) => {
-    const card = cardsById.get(cid) || { name: "?", cost: 0, power: 0, toughness: 0 };
+    const card = cardsById.get(cid) || {
+      name: "?",
+      cost: 0,
+      power: 0,
+      toughness: 0,
+    };
     const mesh = createCardMesh(card, true);
     mesh.position.set(startX + i * spacing, 0.5, 9.5);
     mesh.rotation.x = -Math.PI / 5;
@@ -546,7 +646,12 @@ function renderFromState(state, myRole) {
   // 相手手札（裏）
   const oStartX = -((enemy.hand.length - 1) * spacing) / 2;
   enemy.hand.forEach((cid, i) => {
-    const card = cardsById.get(cid) || { name: "?", cost: 0, power: 0, toughness: 0 };
+    const card = cardsById.get(cid) || {
+      name: "?",
+      cost: 0,
+      power: 0,
+      toughness: 0,
+    };
     const mesh = createCardMesh(card, false);
     mesh.position.set(oStartX + i * spacing, 0.5, -9.5);
     mesh.rotation.x = -Math.PI / 7;
@@ -559,7 +664,12 @@ function renderFromState(state, myRole) {
   const fSpacing = 2.4;
   const fStartX = -((me.field.length - 1) * fSpacing) / 2;
   me.field.forEach((cid, i) => {
-    const card = cardsById.get(cid) || { name: "?", cost: 0, power: 0, toughness: 0 };
+    const card = cardsById.get(cid) || {
+      name: "?",
+      cost: 0,
+      power: 0,
+      toughness: 0,
+    };
     const mesh = createCardMesh(card, true);
     mesh.position.set(fStartX + i * fSpacing, 0.51, 3.0);
     mesh.rotation.x = -Math.PI / 2;
@@ -571,7 +681,12 @@ function renderFromState(state, myRole) {
   // 相手場
   const efStartX = -((enemy.field.length - 1) * fSpacing) / 2;
   enemy.field.forEach((cid, i) => {
-    const card = cardsById.get(cid) || { name: "?", cost: 0, power: 0, toughness: 0 };
+    const card = cardsById.get(cid) || {
+      name: "?",
+      cost: 0,
+      power: 0,
+      toughness: 0,
+    };
     const mesh = createCardMesh(card, true);
     mesh.position.set(efStartX + i * fSpacing, 0.51, -3.0);
     mesh.rotation.x = -Math.PI / 2;
@@ -582,9 +697,4 @@ function renderFromState(state, myRole) {
   });
 }
 
-export {
-  initThree,
-  renderFromState,
-  setInputHandlers,
-  hitTestAtScreen,
-};
+export { initThree, renderFromState, setInputHandlers, hitTestAtScreen };

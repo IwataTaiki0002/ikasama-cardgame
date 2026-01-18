@@ -235,12 +235,10 @@ function isActionMenuOpen() {
 function isModalOpen() {
   const accuse = qs("accuse-ui");
   const over = qs("game-over");
-  const cheat = qs("cheat-menu");
   const action = qs("action-menu");
   return (
     (accuse && accuse.style.display === "flex") ||
     (over && over.style.display === "flex") ||
-    (cheat && cheat.style.display === "block") ||
     (action && action.style.display === "block")
   );
 }
@@ -640,38 +638,7 @@ function openAccuseUI() {
     .slice(-10)
     .reverse();
 
-  if (recent.length === 0) {
-    const div = document.createElement("div");
-    div.className = "accuse-option";
-    div.textContent = "直近10秒の相手イカサマはありません（押すと失敗扱い）";
-    div.addEventListener("click", () => {
-      latestState.player.penalty += 1;
-      endGameIfNeeded();
-      applyRender();
-      closeAccuseUI();
-    });
-    opts.appendChild(div);
-    return;
-  }
-
-  recent.forEach((item, i) => {
-    const div = document.createElement("div");
-    div.className = "accuse-option";
-    div.textContent = `[${i}] ${item.action} (ts=${item.ts.toFixed(2)})`;
-    div.addEventListener("click", () => {
-      latestState.opponent.penalty += 1;
-      latestState.cheatLog.push({
-        ts: Date.now() / 1000,
-        by: "player",
-        action: "accuse",
-        payload: { targetTs: item.ts, targetAction: item.action },
-      });
-      endGameIfNeeded();
-      applyRender();
-      closeAccuseUI();
-    });
-    opts.appendChild(div);
-  });
+  // 指摘UIのクリック操作は削除（キーボード操作のみ）
 }
 
 function closeAccuseUI() {
@@ -684,29 +651,7 @@ function closeAccuseUI() {
 }
 
 // ===== cheat menu（マウス） =====
-function openCheatMenu(x, y) {
-  const menu = qs("cheat-menu");
-  if (!menu) return;
-  menu.style.left = `${x}px`;
-  menu.style.top = `${y}px`;
-  menu.style.display = "block";
-}
-function closeCheatMenu() {
-  const menu = qs("cheat-menu");
-  if (!menu) return;
-  menu.style.display = "none";
-}
-
-function setupMenuEvents() {
-  const menu = qs("cheat-menu");
-  if (!menu) return;
-
-  menu.querySelectorAll(".menu-item").forEach((item) => {
-    item.addEventListener("click", () => closeCheatMenu());
-  });
-
-  document.addEventListener("click", () => closeCheatMenu());
-}
+// openCheatMenu, closeCheatMenu, setupMenuEvents: マウス操作を無効化のため削除
 
 function setupButtons() {
   const startBtn = qs("btn-start");
@@ -727,36 +672,22 @@ function setupButtons() {
 
 // ===== 起動 =====
 document.addEventListener("DOMContentLoaded", () => {
-  setupMenuEvents();
   setupButtons();
-
   initThree(document.getElementById("game-3d-container"));
-
-  // マウス入力を無効化（キーボード操作限定）
-  // setInputHandlers({
-  //   onOpenCheat: (x, y) => openCheatMenu(x, y),
-  //   onAccuse: () => openAccuseUI(),
-  // });
-
   latestState = newInitialState();
   showCursor(true);
   applyRender();
-
   const panel = qs("connection-panel");
   if (panel) panel.style.display = "none";
-
   window.addEventListener("resize", () => {
     cursor.x = clamp(cursor.x, 8, window.innerWidth - 8);
     cursor.y = clamp(cursor.y, 8, window.innerHeight - 8);
     applyRender();
   });
-
   // ===== キー押下 =====
   window.addEventListener("keydown", (e) => {
     const kRaw = e.key;
     const k = kRaw.toLowerCase();
-
-    // ✅ アクションメニューが開いている時は「選択操作」優先
     if (isActionMenuOpen()) {
       if (
         kRaw === "ArrowUp" ||
@@ -787,11 +718,8 @@ document.addEventListener("DOMContentLoaded", () => {
         applyRender();
         return;
       }
-      // メニュー中はその他キー無視
       return;
     }
-
-    // ===== 通常時：カーソル移動 =====
     if (kRaw === "ArrowLeft") {
       e.preventDefault();
       keys.left = true;
@@ -812,8 +740,6 @@ document.addEventListener("DOMContentLoaded", () => {
       keys.down = true;
       startMoveLoop();
     }
-
-    // ===== Z：決定 =====
     if (k === "z") {
       e.preventDefault();
       if (!zDown && !e.repeat && !isModalOpen()) {
@@ -821,8 +747,6 @@ document.addEventListener("DOMContentLoaded", () => {
         doActionAtCursor();
       }
     }
-
-    // ===== C：指摘 =====
     if (k === "c") {
       e.preventDefault();
       if (!cDown && !e.repeat && !isModalOpen()) {
@@ -830,76 +754,51 @@ document.addEventListener("DOMContentLoaded", () => {
         openAccuseUI();
       }
     }
-
-    // ===== X：キャンセル =====
     if (k === "x") {
       e.preventDefault();
       if (!xDown && !e.repeat) {
         xDown = true;
-
-        // 指摘UIが開いていれば閉じる
         const accuse = qs("accuse-ui");
         if (accuse && accuse.style.display === "flex") {
           closeAccuseUI();
           applyRender();
           return;
         }
-
-        // cheatメニューが開いていれば閉じる
-        const cheat = qs("cheat-menu");
-        if (cheat && cheat.style.display === "block") {
-          closeCheatMenu();
-          applyRender();
-          return;
-        }
       }
     }
-
-    // ===== S：スタート =====
     if (k === "s") {
       e.preventDefault();
       if (!e.repeat) {
         startGameOffline();
       }
     }
-
-    // ===== E：ターン終了 =====
     if (k === "e") {
       e.preventDefault();
       if (!e.repeat) {
         endTurnManual();
       }
     }
-
     applyRender();
   });
-
-  // ===== キー離上 =====
   window.addEventListener("keyup", (e) => {
     const kRaw = e.key;
     const k = kRaw.toLowerCase();
-
     if (kRaw === "ArrowLeft") keys.left = false;
     if (kRaw === "ArrowRight") keys.right = false;
     if (kRaw === "ArrowUp") keys.up = false;
     if (kRaw === "ArrowDown") keys.down = false;
-
     if (k === "z") zDown = false;
     if (k === "x") xDown = false;
     if (k === "c") cDown = false;
-
     if (!keys.left && !keys.right && !keys.up && !keys.down) stopMoveLoop();
-
     applyRender();
   });
-
   window.addEventListener("blur", () => {
     keys.left = keys.right = keys.up = keys.down = false;
     zDown = false;
     xDown = false;
     cDown = false;
     stopMoveLoop();
-    // 念のためメニューも閉じる
     closeActionMenu();
   });
 });

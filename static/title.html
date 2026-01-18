@@ -19,7 +19,7 @@
         align-items: center;
         min-height: 100vh;
         overflow: hidden;
-        cursor: none;
+        /* cursor: none; 削除 */
       }
 
       .title-screen {
@@ -66,76 +66,9 @@
         box-shadow: 0 2px 10px rgba(255, 102, 0, 0.5);
       }
 
-      /* カスタムカーソル */
-      .kb-cursor {
-        position: fixed;
-        width: 22px;
-        height: 22px;
-        transform: translate(-50%, -50%);
-        z-index: 1600;
-        pointer-events: none;
-      }
+      /* カスタムカーソル関連スタイル削除 */
 
-      .kb-cursor-dot {
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        width: 10px;
-        height: 10px;
-        transform: translate(-50%, -50%);
-        border-radius: 50%;
-        background: rgba(0, 255, 255, 0.85);
-        box-shadow: 0 0 14px rgba(0, 255, 255, 0.75);
-        border: 1px solid rgba(255, 255, 255, 0.6);
-      }
-
-      .kb-cursor::before,
-      .kb-cursor::after {
-        content: "";
-        position: absolute;
-        left: 50%;
-        top: 50%;
-        width: 22px;
-        height: 2px;
-        background: rgba(0, 255, 255, 0.55);
-        transform: translate(-50%, -50%);
-      }
-
-      .kb-cursor::after {
-        width: 2px;
-        height: 22px;
-      }
-
-      /* 操作ヘルプ */
-      .help-overlay {
-        position: fixed;
-        left: 16px;
-        bottom: 16px;
-        z-index: 1500;
-        background: rgba(0, 0, 0, 0.65);
-        border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 10px;
-        padding: 12px 14px;
-        color: #fff;
-        font-size: 13px;
-        line-height: 1.45;
-        pointer-events: none;
-        backdrop-filter: blur(4px);
-      }
-
-      .help-title {
-        font-weight: bold;
-        margin-bottom: 6px;
-        color: #ffd700;
-      }
-
-      .help-line {
-        margin: 2px 0;
-      }
-
-      .help-line b {
-        color: #00ff00;
-      }
+      /* 操作ヘルプ関連スタイル削除 */
 
       @keyframes fadeIn {
         from {
@@ -151,18 +84,11 @@
   </head>
 
   <body>
-    <!-- カスタムカーソル -->
-    <div id="kb-cursor" class="kb-cursor">
-      <div class="kb-cursor-dot"></div>
-    </div>
-
-    <!-- 操作ヘルプ -->
+    <!-- 操作ヘルプ（キーボード操作のみ） -->
     <div class="help-overlay">
-      <div class="help-title">操作方法</div>
+      <div class="help-title">操作方法（キーボードのみ）</div>
       <div class="help-line">↑↓←→：カーソル移動</div>
-      <div class="help-line">
-        <b>Z</b>：決定（対象によってメニュー/アクション）
-      </div>
+      <div class="help-line"><b>Z</b>：決定（メニュー/アクション）</div>
       <div class="help-line"><b>X</b>：キャンセル（メニュー閉じる）</div>
       <div class="help-line"><b>C</b>：指摘（Accuse）</div>
       <div class="help-line"><b>S</b>：ゲームスタート</div>
@@ -175,125 +101,11 @@
     </div>
 
     <script>
-      // カーソル位置
-      let cursorX = window.innerWidth / 2;
-      let cursorY = window.innerHeight / 2;
-      const cursor = document.getElementById("kb-cursor");
+      // スタートボタンクリックのみ
       const startButton = document.getElementById("start-button");
-      const CURSOR_SPEED = 420;
-
-      // カーソル移動用
-      let keys = { up: false, down: false, left: false, right: false };
-      let moveLoopRunning = false;
-
-      function updateCursorPosition() {
-        cursor.style.left = cursorX + "px";
-        cursor.style.top = cursorY + "px";
-      }
-
-      function clamp(n, min, max) {
-        return Math.max(min, Math.min(max, n));
-      }
-
-      function startMoveLoop() {
-        if (moveLoopRunning) return;
-        moveLoopRunning = true;
-
-        let lastT = performance.now();
-        function loop(now) {
-          if (!moveLoopRunning) return;
-          const delta = now - lastT;
-          lastT = now;
-
-          const dist = (CURSOR_SPEED * delta) / 1000;
-          if (keys.left) cursorX -= dist;
-          if (keys.right) cursorX += dist;
-          if (keys.up) cursorY -= dist;
-          if (keys.down) cursorY += dist;
-
-          cursorX = clamp(cursorX, 8, window.innerWidth - 8);
-          cursorY = clamp(cursorY, 8, window.innerHeight - 8);
-
-          updateCursorPosition();
-          requestAnimationFrame(loop);
-        }
-        requestAnimationFrame(loop);
-      }
-
-      function stopMoveLoop() {
-        moveLoopRunning = false;
-      }
-
-      // スタートボタンクリック
       startButton.addEventListener("click", () => {
         window.location.href = "index.html";
       });
-
-      // キーボード操作（矢印キー、Z、Xのみ）
-      window.addEventListener("keydown", (e) => {
-        const kRaw = e.key;
-        const k = kRaw.toLowerCase();
-
-        // 矢印キー：カーソル移動
-        if (kRaw === "ArrowLeft") {
-          e.preventDefault();
-          keys.left = true;
-          startMoveLoop();
-        }
-        if (kRaw === "ArrowRight") {
-          e.preventDefault();
-          keys.right = true;
-          startMoveLoop();
-        }
-        if (kRaw === "ArrowUp") {
-          e.preventDefault();
-          keys.up = true;
-          startMoveLoop();
-        }
-        if (kRaw === "ArrowDown") {
-          e.preventDefault();
-          keys.down = true;
-          startMoveLoop();
-        }
-
-        // Zキー：決定（スタートボタン上なら画面遷移）
-        if (k === "z") {
-          e.preventDefault();
-          const rect = startButton.getBoundingClientRect();
-          if (
-            cursorX >= rect.left &&
-            cursorX <= rect.right &&
-            cursorY >= rect.top &&
-            cursorY <= rect.bottom
-          ) {
-            window.location.href = "index.html";
-          }
-        }
-
-        // Xキー：キャンセル（何もしない）
-        if (k === "x") {
-          e.preventDefault();
-          // タイトル画面では特に何もしない
-        }
-
-        // その他のキー（C、S、Eなど）は無視
-      });
-
-      window.addEventListener("keyup", (e) => {
-        const kRaw = e.key;
-
-        if (kRaw === "ArrowLeft") keys.left = false;
-        if (kRaw === "ArrowRight") keys.right = false;
-        if (kRaw === "ArrowUp") keys.up = false;
-        if (kRaw === "ArrowDown") keys.down = false;
-
-        if (!keys.left && !keys.right && !keys.up && !keys.down) {
-          stopMoveLoop();
-        }
-      });
-
-      // 初期カーソル位置を設定
-      updateCursorPosition();
     </script>
   </body>
 </html>

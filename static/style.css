@@ -148,31 +148,7 @@ canvas {
   box-shadow: 0 0 15px rgba(255, 170, 0, 0.8);
 }
 
-.cheat-menu {
-  position: fixed;
-  background: rgba(0, 0, 0, 0.95);
-  border: 2px solid #ffaa00;
-  border-radius: 8px;
-  box-shadow: 0 0 20px rgba(255, 170, 0, 0.5);
-  z-index: 1000;
-  min-width: 240px;
-  padding: 8px;
-  pointer-events: auto;
-}
-
-.menu-item {
-  padding: 10px 15px;
-  color: #fff;
-  cursor: pointer;
-  font-size: 13px;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.menu-item:hover {
-  background: rgba(255, 170, 0, 0.3);
-  color: #ffff00;
-}
+/* cheat-menu と menu-item: マウス操作廃止のため削除 */
 
 .accuse-ui {
   position: fixed;
