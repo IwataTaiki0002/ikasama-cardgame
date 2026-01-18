@@ -55,6 +55,29 @@
           <div class="turn-label" id="opponent-turn-label">相手のターン</div>
           <div class="timer" id="timer">60</div>
           <div class="turn-label" id="player-turn-label">あなたのターン</div>
+          <!-- 先攻・後攻表示 -->
+          <div
+            id="first-attack-indicator"
+            style="
+              display: none;
+              font-size: 2.2em;
+              color: #fff;
+              background: rgba(0, 0, 0, 0.92);
+              border: 3px solid #ffaa00;
+              border-radius: 16px;
+              padding: 32px 48px;
+              position: fixed;
+              left: 50%;
+              top: 50%;
+              transform: translate(-50%, -50%);
+              z-index: 3000;
+              text-align: center;
+              font-weight: bold;
+              letter-spacing: 2px;
+              box-shadow: 0 0 32px #ffaa00;
+              pointer-events: none;
+            "
+          ></div>
 
           <div class="penalty-row" id="penalty-player">
             <div class="penalty-card"></div>
@@ -62,12 +85,7 @@
             <div class="penalty-card"></div>
           </div>
 
-          <div style="display: flex; gap: 10px; justify-content: center">
-            <button id="btn-start" style="pointer-events: auto">START</button>
-            <button id="btn-endturn" style="pointer-events: auto">
-              END TURN
-            </button>
-          </div>
+          <!-- START/END TURNボタン削除済み -->
         </div>
       </div>
     </div>
