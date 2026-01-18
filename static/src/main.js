@@ -1,5 +1,10 @@
 // static/src/main.js
-import { initThree, renderFromState, setInputHandlers, hitTestAtScreen } from "./render-3d.js";
+import {
+  initThree,
+  renderFromState,
+  setInputHandlers,
+  hitTestAtScreen,
+} from "./render-3d.js";
 
 const OFFLINE_MODE = true;
 
@@ -15,7 +20,9 @@ let latestState = null;
 let timerInterval = null;
 
 // ===== DOM =====
-function qs(id) { return document.getElementById(id); }
+function qs(id) {
+  return document.getElementById(id);
+}
 
 // ===== 2Dカーソル状態 =====
 let cursor = {
@@ -24,7 +31,9 @@ let cursor = {
   visible: true,
 };
 
-function clamp(n, a, b) { return Math.max(a, Math.min(b, n)); }
+function clamp(n, a, b) {
+  return Math.max(a, Math.min(b, n));
+}
 
 function showCursor(show) {
   const c = qs("kb-cursor");
@@ -45,7 +54,7 @@ function updateCursorDOM() {
 }
 
 // ===== キー同時押し管理（斜め移動） =====
-const keys = { up:false, down:false, left:false, right:false };
+const keys = { up: false, down: false, left: false, right: false };
 
 // 連射防止
 let zDown = false;
@@ -70,7 +79,8 @@ function startMoveLoop() {
       return;
     }
 
-    let dx = 0, dy = 0;
+    let dx = 0,
+      dy = 0;
     if (keys.left) dx -= 1;
     if (keys.right) dx += 1;
     if (keys.up) dy -= 1;
@@ -121,8 +131,26 @@ function newInitialState() {
     timer: TURN_SECONDS,
     isGameOver: false,
     winner: null,
-    player: { hp: 20, mana: 3, maxMana: 3, hand: [], field: [], deck: 10, penalty: 0, grave: [] },
-    opponent: { hp: 20, mana: 3, maxMana: 3, hand: [], field: [], deck: 10, penalty: 0, grave: [] },
+    player: {
+      hp: 20,
+      mana: 3,
+      maxMana: 3,
+      hand: [],
+      field: [],
+      deck: 10,
+      penalty: 0,
+      grave: [],
+    },
+    opponent: {
+      hp: 20,
+      mana: 3,
+      maxMana: 3,
+      hand: [],
+      field: [],
+      deck: 10,
+      penalty: 0,
+      grave: [],
+    },
     cards: CARD_DB,
     cheatLog: [],
   };
@@ -142,7 +170,9 @@ function updatePenalty(state) {
     const row = qs(id);
     if (!row) return;
     const cards = row.querySelectorAll(".penalty-card");
-    cards.forEach((c, i) => i < n ? c.classList.add("active") : c.classList.remove("active"));
+    cards.forEach((c, i) =>
+      i < n ? c.classList.add("active") : c.classList.remove("active"),
+    );
   };
   setRow("penalty-player", state.player.penalty || 0);
   setRow("penalty-opponent", state.opponent.penalty || 0);
@@ -160,11 +190,17 @@ function updateTimerUI(state) {
 function updateGameOver(state) {
   const over = qs("game-over");
   if (!over) return;
-  if (!state.isGameOver) { over.style.display = "none"; return; }
+  if (!state.isGameOver) {
+    over.style.display = "none";
+    return;
+  }
   qs("game-over-title").textContent = "ゲーム終了";
   qs("game-over-message").textContent =
-    state.winner === "player" ? "あなたの勝ち！" :
-    state.winner === "opponent" ? "あなたの負け…" : "終了";
+    state.winner === "player"
+      ? "あなたの勝ち！"
+      : state.winner === "opponent"
+        ? "あなたの負け…"
+        : "終了";
   over.style.display = "flex";
 }
 
@@ -201,20 +237,32 @@ function isModalOpen() {
   const over = qs("game-over");
   const cheat = qs("cheat-menu");
   const action = qs("action-menu");
-  return (accuse && accuse.style.display === "flex")
-      || (over && over.style.display === "flex")
-      || (cheat && cheat.style.display === "block")
-      || (action && action.style.display === "block");
+  return (
+    (accuse && accuse.style.display === "flex") ||
+    (over && over.style.display === "flex") ||
+    (cheat && cheat.style.display === "block") ||
+    (action && action.style.display === "block")
+  );
 }
 
 // ===== ゲームロジック =====
 function endGameIfNeeded() {
   const s = latestState;
   if (!s || s.isGameOver) return;
-  if (s.player.hp <= 0) { s.isGameOver = true; s.winner = "opponent"; }
-  else if (s.opponent.hp <= 0) { s.isGameOver = true; s.winner = "player"; }
-  if (s.player.penalty >= MAX_PENALTY) { s.isGameOver = true; s.winner = "opponent"; }
-  else if (s.opponent.penalty >= MAX_PENALTY) { s.isGameOver = true; s.winner = "player"; }
+  if (s.player.hp <= 0) {
+    s.isGameOver = true;
+    s.winner = "opponent";
+  } else if (s.opponent.hp <= 0) {
+    s.isGameOver = true;
+    s.winner = "player";
+  }
+  if (s.player.penalty >= MAX_PENALTY) {
+    s.isGameOver = true;
+    s.winner = "opponent";
+  } else if (s.opponent.penalty >= MAX_PENALTY) {
+    s.isGameOver = true;
+    s.winner = "player";
+  }
 }
 
 function startTimer() {
@@ -242,7 +290,7 @@ function simulateOpponentTurn() {
   if (opp.hand.length && Math.random() < 0.5) {
     const idx = 0;
     const cid = opp.hand[idx];
-    const card = CARD_DB.find(c => c.id === cid);
+    const card = CARD_DB.find((c) => c.id === cid);
     if (card && opp.mana >= card.cost) {
       opp.mana -= card.cost;
       opp.hand.splice(idx, 1);
@@ -255,10 +303,20 @@ function simulateOpponentTurn() {
     const kind = ["modify-hp", "modify-mana"][Math.floor(Math.random() * 2)];
     if (kind === "modify-hp") {
       s.player.hp += -1;
-      s.cheatLog.push({ ts: Date.now() / 1000, by: "opponent", action: kind, payload: { target: "opponent", delta: -1 } });
+      s.cheatLog.push({
+        ts: Date.now() / 1000,
+        by: "opponent",
+        action: kind,
+        payload: { target: "opponent", delta: -1 },
+      });
     } else {
       s.player.mana = Math.max(0, s.player.mana - 1);
-      s.cheatLog.push({ ts: Date.now() / 1000, by: "opponent", action: kind, payload: { target: "opponent", delta: -1 } });
+      s.cheatLog.push({
+        ts: Date.now() / 1000,
+        by: "opponent",
+        action: kind,
+        payload: { target: "opponent", delta: -1 },
+      });
     }
     if (s.cheatLog.length > 100) s.cheatLog = s.cheatLog.slice(-100);
   }
@@ -268,7 +326,8 @@ function simulateOpponentTurn() {
 
 function switchTurn() {
   if (!latestState || latestState.isGameOver) return;
-  latestState.currentTurn = latestState.currentTurn === "player" ? "opponent" : "player";
+  latestState.currentTurn =
+    latestState.currentTurn === "player" ? "opponent" : "player";
   latestState.timer = TURN_SECONDS;
 
   if (latestState.currentTurn === "opponent") {
@@ -283,8 +342,8 @@ function switchTurn() {
 function startGameOffline() {
   latestState = newInitialState();
   latestState.started = true;
-  latestState.player.hand = CARD_DB.slice(0, 3).map(c => c.id);
-  latestState.opponent.hand = CARD_DB.slice(0, 3).map(c => c.id);
+  latestState.player.hand = CARD_DB.slice(0, 3).map((c) => c.id);
+  latestState.opponent.hand = CARD_DB.slice(0, 3).map((c) => c.id);
   latestState.currentTurn = "player";
   latestState.timer = TURN_SECONDS;
 
@@ -308,7 +367,7 @@ function playCardOffline(handIndex) {
   const cid = ps.hand[handIndex];
   if (cid == null) return;
 
-  const card = CARD_DB.find(c => c.id === cid);
+  const card = CARD_DB.find((c) => c.id === cid);
   if (!card) return;
   if (ps.mana < card.cost) return;
 
@@ -333,7 +392,12 @@ function sneakToGraveFromHand(handIndex) {
   ps.grave = ps.grave || [];
   ps.grave.push(cid);
 
-  s.cheatLog.push({ ts: Date.now() / 1000, by: "player", action: "sneak-grave", payload: { from: "hand", handIndex } });
+  s.cheatLog.push({
+    ts: Date.now() / 1000,
+    by: "player",
+    action: "sneak-grave",
+    payload: { from: "hand", handIndex },
+  });
 
   endGameIfNeeded();
   applyRender();
@@ -350,7 +414,12 @@ function sneakDiscardFromHand(handIndex) {
 
   ps.hand.splice(handIndex, 1);
 
-  s.cheatLog.push({ ts: Date.now() / 1000, by: "player", action: "sneak-discard", payload: { from: "hand", handIndex } });
+  s.cheatLog.push({
+    ts: Date.now() / 1000,
+    by: "player",
+    action: "sneak-discard",
+    payload: { from: "hand", handIndex },
+  });
 
   endGameIfNeeded();
   applyRender();
@@ -364,7 +433,12 @@ function destroyOpponentField(fieldIndex) {
   if (fieldIndex < 0 || fieldIndex >= s.opponent.field.length) return;
 
   s.opponent.field.splice(fieldIndex, 1);
-  s.cheatLog.push({ ts: Date.now() / 1000, by: "player", action: "destroy-opponent-demo", payload: { fieldIndex } });
+  s.cheatLog.push({
+    ts: Date.now() / 1000,
+    by: "player",
+    action: "destroy-opponent-demo",
+    payload: { fieldIndex },
+  });
 
   endGameIfNeeded();
   applyRender();
@@ -375,14 +449,14 @@ function destroyOpponentField(fieldIndex) {
    ========================= */
 let actionMenu = {
   open: false,
-  kind: null,         // 今回は "hand" だけ
-  index: null,        // handIndex
-  selected: "up",     // "up" | "left" | "down" | "right"
+  kind: null, // 今回は "hand" だけ
+  index: null, // handIndex
+  selected: "up", // "up" | "left" | "down" | "right"
   slots: {
-    up:   null,       // { label, type, onConfirm }
+    up: null, // { label, type, onConfirm }
     left: null,
     down: null,
-    right:null,
+    right: null,
   },
 };
 
@@ -400,7 +474,12 @@ function setActionSlot(dir, slot) {
   const text = qs(`action-${dir}-text`);
   if (!box || !text) return;
 
-  box.classList.remove("action-normal", "action-cheat", "action-empty", "action-selected");
+  box.classList.remove(
+    "action-normal",
+    "action-cheat",
+    "action-empty",
+    "action-selected",
+  );
 
   if (!slot || !slot.label) {
     box.classList.add("action-empty");
@@ -414,7 +493,7 @@ function setActionSlot(dir, slot) {
 }
 
 function refreshActionSelectionUI() {
-  ["up","left","down","right"].forEach(d => {
+  ["up", "left", "down", "right"].forEach((d) => {
     const box = qs(`action-${d}`);
     if (!box) return;
     box.classList.remove("action-selected");
@@ -430,7 +509,7 @@ function openActionMenuForHand(handIndex) {
   if (handIndex == null || handIndex < 0 || handIndex >= ps.hand.length) return;
 
   const cid = ps.hand[handIndex];
-  const card = CARD_DB.find(c => c.id === cid) || { name: "?", cost: 0 };
+  const card = CARD_DB.find((c) => c.id === cid) || { name: "?", cost: 0 };
 
   actionMenu.open = true;
   actionMenu.kind = "hand";
@@ -480,7 +559,7 @@ function closeActionMenu() {
   actionMenu.kind = null;
   actionMenu.index = null;
   actionMenu.selected = "up";
-  actionMenu.slots = { up:null, left:null, down:null, right:null };
+  actionMenu.slots = { up: null, left: null, down: null, right: null };
 
   const m = qs("action-menu");
   if (m) m.style.display = "none";
@@ -545,7 +624,10 @@ function openAccuseUI() {
   const timer = setInterval(() => {
     t--;
     el.textContent = String(t);
-    if (t <= 0) { clearInterval(timer); closeAccuseUI(); }
+    if (t <= 0) {
+      clearInterval(timer);
+      closeAccuseUI();
+    }
   }, 1000);
   ui.dataset.timerId = String(timer);
 
@@ -554,7 +636,7 @@ function openAccuseUI() {
 
   const now = Date.now() / 1000;
   const recent = (latestState.cheatLog || [])
-    .filter(x => x.by === "opponent" && (now - x.ts) <= ACCUSE_WINDOW_SEC)
+    .filter((x) => x.by === "opponent" && now - x.ts <= ACCUSE_WINDOW_SEC)
     .slice(-10)
     .reverse();
 
@@ -578,7 +660,12 @@ function openAccuseUI() {
     div.textContent = `[${i}] ${item.action} (ts=${item.ts.toFixed(2)})`;
     div.addEventListener("click", () => {
       latestState.opponent.penalty += 1;
-      latestState.cheatLog.push({ ts: Date.now() / 1000, by: "player", action: "accuse", payload: { targetTs: item.ts, targetAction: item.action } });
+      latestState.cheatLog.push({
+        ts: Date.now() / 1000,
+        by: "player",
+        action: "accuse",
+        payload: { targetTs: item.ts, targetAction: item.action },
+      });
       endGameIfNeeded();
       applyRender();
       closeAccuseUI();
@@ -614,7 +701,7 @@ function setupMenuEvents() {
   const menu = qs("cheat-menu");
   if (!menu) return;
 
-  menu.querySelectorAll(".menu-item").forEach(item => {
+  menu.querySelectorAll(".menu-item").forEach((item) => {
     item.addEventListener("click", () => closeCheatMenu());
   });
 
@@ -626,12 +713,13 @@ function setupButtons() {
   const endBtn = qs("btn-endturn");
 
   if (startBtn) startBtn.addEventListener("click", () => startGameOffline());
-  if (endBtn) endBtn.addEventListener("click", () => {
-    if (!latestState || !latestState.started) return;
-    if (latestState.isGameOver) return;
-    if (latestState.currentTurn !== "player") return;
-    switchTurn();
-  });
+  if (endBtn)
+    endBtn.addEventListener("click", () => {
+      if (!latestState || !latestState.started) return;
+      if (latestState.isGameOver) return;
+      if (latestState.currentTurn !== "player") return;
+      switchTurn();
+    });
 
   const cancel = qs("accuse-cancel");
   if (cancel) cancel.addEventListener("click", () => closeAccuseUI());
@@ -644,10 +732,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
   initThree(document.getElementById("game-3d-container"));
 
-  setInputHandlers({
-    onOpenCheat: (x, y) => openCheatMenu(x, y),
-    onAccuse: () => openAccuseUI(),
-  });
+  // マウス入力を無効化（キーボード操作限定）
+  // setInputHandlers({
+  //   onOpenCheat: (x, y) => openCheatMenu(x, y),
+  //   onAccuse: () => openAccuseUI(),
+  // });
 
   latestState = newInitialState();
   showCursor(true);
@@ -669,7 +758,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // ✅ アクションメニューが開いている時は「選択操作」優先
     if (isActionMenuOpen()) {
-      if (kRaw === "ArrowUp" || kRaw === "ArrowDown" || kRaw === "ArrowLeft" || kRaw === "ArrowRight") {
+      if (
+        kRaw === "ArrowUp" ||
+        kRaw === "ArrowDown" ||
+        kRaw === "ArrowLeft" ||
+        kRaw === "ArrowRight"
+      ) {
         e.preventDefault();
         moveActionSelection(kRaw);
         applyRender();
@@ -698,10 +792,26 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ===== 通常時：カーソル移動 =====
-    if (kRaw === "ArrowLeft") { e.preventDefault(); keys.left = true; startMoveLoop(); }
-    if (kRaw === "ArrowRight") { e.preventDefault(); keys.right = true; startMoveLoop(); }
-    if (kRaw === "ArrowUp") { e.preventDefault(); keys.up = true; startMoveLoop(); }
-    if (kRaw === "ArrowDown") { e.preventDefault(); keys.down = true; startMoveLoop(); }
+    if (kRaw === "ArrowLeft") {
+      e.preventDefault();
+      keys.left = true;
+      startMoveLoop();
+    }
+    if (kRaw === "ArrowRight") {
+      e.preventDefault();
+      keys.right = true;
+      startMoveLoop();
+    }
+    if (kRaw === "ArrowUp") {
+      e.preventDefault();
+      keys.up = true;
+      startMoveLoop();
+    }
+    if (kRaw === "ArrowDown") {
+      e.preventDefault();
+      keys.down = true;
+      startMoveLoop();
+    }
 
     // ===== Z：決定 =====
     if (k === "z") {
@@ -742,6 +852,22 @@ document.addEventListener("DOMContentLoaded", () => {
           applyRender();
           return;
         }
+      }
+    }
+
+    // ===== S：スタート =====
+    if (k === "s") {
+      e.preventDefault();
+      if (!e.repeat) {
+        startGameOffline();
+      }
+    }
+
+    // ===== E：ターン終了 =====
+    if (k === "e") {
+      e.preventDefault();
+      if (!e.repeat) {
+        endTurnManual();
       }
     }
 

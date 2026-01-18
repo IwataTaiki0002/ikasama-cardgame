@@ -1,0 +1,12 @@
+{
+  "name": "project",
+  "version": "1.0.0",
+  "description": "Python FastAPI server launcher",
+  "main": "server.py",
+  "scripts": {
+    "dev": "python -m uvicorn server:app --reload"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

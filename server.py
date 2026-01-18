@@ -8,6 +8,7 @@ from dataclasses import dataclass, asdict, field
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 
@@ -434,7 +435,12 @@ def get_room(room_id: str) -> Room:
 # =========================
 app = FastAPI()
 
-# 静的配信
+# ルートパスでtitle.htmlを返す
+@app.get("/")
+async def root():
+    return FileResponse("static/title.html")
+
+# 静的ファイル配信
 app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 
