@@ -48,22 +48,11 @@
         border: 3px solid #ffaa00;
         border-radius: 12px;
         padding: 16px 60px;
-        cursor: none;
         box-shadow: 0 4px 20px rgba(255, 102, 0, 0.6);
-        transition: all 0.3s ease;
+        transition: none;
         text-transform: uppercase;
         letter-spacing: 2px;
-      }
-
-      .start-button:hover {
-        background: linear-gradient(135deg, #ff7711, #ff4422);
-        box-shadow: 0 6px 30px rgba(255, 102, 0, 0.9);
-        transform: translateY(-2px);
-      }
-
-      .start-button:active {
-        transform: translateY(0);
-        box-shadow: 0 2px 10px rgba(255, 102, 0, 0.5);
+        pointer-events: none; /* マウス操作を完全無効化 */
       }
 
       /* カスタムカーソル関連スタイル削除 */
@@ -84,15 +73,28 @@
   </head>
 
   <body>
-    <!-- 操作ヘルプ（キーボード操作のみ） -->
+    <!-- 操作ヘルプ（ゲーム画面と同じ見た目・位置） -->
+    <link rel="stylesheet" href="style.css" />
     <div class="help-overlay">
-      <div class="help-title">操作方法（キーボードのみ）</div>
+      <div class="help-title">操作（キーボード限定）</div>
       <div class="help-line">↑↓←→：カーソル移動</div>
-      <div class="help-line"><b>Z</b>：決定（メニュー/アクション）</div>
+      <div class="help-line">
+        <b>Z</b>：決定（対象によってメニュー/アクション）
+      </div>
       <div class="help-line"><b>X</b>：キャンセル（メニュー閉じる）</div>
       <div class="help-line"><b>C</b>：指摘（Accuse）</div>
       <div class="help-line"><b>S</b>：ゲームスタート</div>
       <div class="help-line"><b>E</b>：ターン終了</div>
+    </div>
+
+    <!-- 2Dカーソル（キーボード操作用） -->
+    <div
+      id="kb-cursor"
+      class="kb-cursor"
+      style="left: 50vw; top: 80vh; display: block"
+    >
+      <div class="kb-cursor-dot"></div>
+      <div class="kb-cursor-label" id="kb-cursor-label">START</div>
     </div>
 
     <div class="title-screen">
@@ -101,10 +103,155 @@
     </div>
 
     <script>
-      // スタートボタンクリックのみ
+      // タイトル画面用キーボード操作・カーソル移動
       const startButton = document.getElementById("start-button");
-      startButton.addEventListener("click", () => {
-        window.location.href = "index.html";
+      const kbCursor = document.getElementById("kb-cursor");
+      const kbCursorLabel = document.getElementById("kb-cursor-label");
+      // スタートボタンの中央座標を初期カーソル位置にする
+      function getStartButtonCenter() {
+        const rect = startButton.getBoundingClientRect();
+        return {
+          x: rect.left + rect.width / 2,
+          y: rect.top + rect.height / 2,
+        };
+      }
+      let { x: cursorX, y: cursorY } = {
+        x: window.innerWidth * 0.5,
+        y: window.innerHeight * 0.8,
+      };
+      const CURSOR_SPEED = 420;
+      let keys = { up: false, down: false, left: false, right: false };
+      let moveLoop = null;
+
+      function clamp(n, min, max) {
+        return Math.max(min, Math.min(max, n));
+      }
+      function updateCursor() {
+        kbCursor.style.left = cursorX + "px";
+        kbCursor.style.top = cursorY + "px";
+        // スタートボタン上ならラベルをSTARTに
+        const rect = startButton.getBoundingClientRect();
+        if (
+          cursorX >= rect.left &&
+          cursorX <= rect.right &&
+          cursorY >= rect.top &&
+          cursorY <= rect.bottom
+        ) {
+          kbCursorLabel.textContent = "START";
+        } else {
+          kbCursorLabel.textContent = "";
+        }
+      }
+
+      function startMoveLoop() {
+        if (moveLoop) return;
+        let lastT = performance.now();
+        function loop(now) {
+          const dt = (now - lastT) / 1000;
+          lastT = now;
+          let dx = 0,
+            dy = 0;
+          if (keys.left) dx -= 1;
+          if (keys.right) dx += 1;
+          if (keys.up) dy -= 1;
+          if (keys.down) dy += 1;
+          if (dx !== 0 || dy !== 0) {
+            const len = Math.hypot(dx, dy);
+            dx /= len;
+            dy /= len;
+            cursorX += dx * CURSOR_SPEED * dt;
+            cursorY += dy * CURSOR_SPEED * dt;
+            cursorX = clamp(cursorX, 8, window.innerWidth - 8);
+            cursorY = clamp(cursorY, 8, window.innerHeight - 8);
+            updateCursor();
+          }
+          moveLoop = requestAnimationFrame(loop);
+        }
+        moveLoop = requestAnimationFrame(loop);
+      }
+      function stopMoveLoop() {
+        if (moveLoop) cancelAnimationFrame(moveLoop);
+        moveLoop = null;
+      }
+      document.addEventListener("keydown", (e) => {
+        const k = e.key;
+        if (k === "ArrowLeft") {
+          e.preventDefault();
+          keys.left = true;
+          startMoveLoop();
+        }
+        if (k === "ArrowRight") {
+          e.preventDefault();
+          keys.right = true;
+          startMoveLoop();
+        }
+        if (k === "ArrowUp") {
+          e.preventDefault();
+          keys.up = true;
+          startMoveLoop();
+        }
+        if (k === "ArrowDown") {
+          e.preventDefault();
+          keys.down = true;
+          startMoveLoop();
+        }
+        // Z/Enter/Space/Sでスタート
+        if (
+          k.toLowerCase() === "z" ||
+          k === "Enter" ||
+          k === " " ||
+          k.toLowerCase() === "s"
+        ) {
+          // カーソルがボタン上なら遷移
+          const rect = startButton.getBoundingClientRect();
+          if (
+            cursorX >= rect.left &&
+            cursorX <= rect.right &&
+            cursorY >= rect.top &&
+            cursorY <= rect.bottom
+          ) {
+            window.location.href = "index.html";
+          }
+        }
+      });
+      document.addEventListener("keyup", (e) => {
+        const k = e.key;
+        if (k === "ArrowLeft") keys.left = false;
+        if (k === "ArrowRight") keys.right = false;
+        if (k === "ArrowUp") keys.up = false;
+        if (k === "ArrowDown") keys.down = false;
+        if (!keys.left && !keys.right && !keys.up && !keys.down) stopMoveLoop();
+      });
+      window.addEventListener("resize", () => {
+        cursorX = clamp(cursorX, 8, window.innerWidth - 8);
+        cursorY = clamp(cursorY, 8, window.innerHeight - 8);
+        updateCursor();
+      });
+      // マウス操作（クリック）は完全に無効化（pointer-events: noneで対応済み）
+      // 初期位置をスタートボタン中央に
+      window.addEventListener("DOMContentLoaded", () => {
+        const center = getStartButtonCenter();
+        cursorX = center.x;
+        cursorY = center.y;
+        updateCursor();
+      });
+      // リサイズ時もスタートボタン中央に寄せる
+      window.addEventListener("resize", () => {
+        const center = getStartButtonCenter();
+        cursorX = clamp(cursorX, 8, window.innerWidth - 8);
+        cursorY = clamp(cursorY, 8, window.innerHeight - 8);
+        // スタートボタン上にあれば中央に吸着
+        const rect = startButton.getBoundingClientRect();
+        if (
+          cursorX >= rect.left &&
+          cursorX <= rect.right &&
+          cursorY >= rect.top &&
+          cursorY <= rect.bottom
+        ) {
+          cursorX = center.x;
+          cursorY = center.y;
+        }
+        updateCursor();
       });
     </script>
   </body>
