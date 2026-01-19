@@ -94,6 +94,8 @@ class Room:
         self.loop_task: Optional[asyncio.Task] = None
         self.started = False
         self.first_attack_role: Optional[str] = None  # "player" or "opponent"
+        self.last_game_state = None  # 前回送信したゲーム状態（差分送信用）
+        self.client_cursors: Dict[str, Dict[str, Any]] = {}  # role -> {x, y, cardId, etc.}
 
     def roles_in_use(self) -> Set[str]:
         return set(self.clients.values())
@@ -183,9 +185,22 @@ class Room:
                         if self.state.timer <= 0:
                             await self._switch_turn_locked()
 
-                    snap = self.snapshot()
-
-                await self.broadcast({"type": "state", "state": snap})
+                    # 現在の状態スナップショットを取得
+                    current_snap = self.snapshot()
+                    
+                    # ゲーム状態が変更された場合のみ送信
+                    if self.last_game_state != current_snap:
+                        await self.broadcast({"type": "state", "state": current_snap})
+                        self.last_game_state = current_snap.copy() if isinstance(current_snap, dict) else current_snap
+                    
+                    # タイマー・カーソル情報は常時送信
+                    realtime_data = {
+                        "type": "realtime",
+                        "timer": self.state.timer if not self.state.isMulliganPhase else None,
+                        "mulliganTimer": self.state.mulliganTimer if self.state.isMulliganPhase else None,
+                        "cursors": self.client_cursors
+                    }
+                    await self.broadcast(realtime_data)
         except asyncio.CancelledError:
             return
 
@@ -223,6 +238,24 @@ class Room:
         self.state.opponentMulliganDone = False
         self.state.playerMulliganCards.clear()
         self.state.opponentMulliganCards.clear()
+    
+    def _action_update_cursor_locked(self, role: str, payload: Dict[str, Any]) -> Tuple[bool, str]:
+        """カーソル位置を更新"""
+        try:
+            x = payload.get('x', 0)
+            y = payload.get('y', 0)
+            card_id = payload.get('cardId')
+            
+            self.client_cursors[role] = {
+                'x': x,
+                'y': y,
+                'cardId': card_id,
+                'timestamp': time.time()
+            }
+            
+            return True, "cursor updated"
+        except Exception as e:
+            return False, f"カーソル更新エラー: {str(e)}"
 
     async def _switch_turn_locked(self) -> None:
         s = self.state
@@ -296,6 +329,10 @@ class Room:
             # マリガン
             if action == "mulligan":
                 return self._action_mulligan_locked(role, payload)
+            
+            # カーソル位置更新
+            if action == "cursor":
+                return self._action_update_cursor_locked(role, payload)
 
             return False, f"不明なaction: {action}"
 

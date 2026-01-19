@@ -279,6 +279,30 @@ document.addEventListener("DOMContentLoaded", () => {
           // 必要なら「接続待機中」など表示
         }
       }
+      if (msg.type === "realtime") {
+        // リアルタイム情報（タイマー・カーソル）の処理
+        if (msg.timer !== null && msg.timer !== undefined) {
+          updateTimerDisplay(msg.timer);
+        }
+        if (msg.mulliganTimer !== null && msg.mulliganTimer !== undefined) {
+          updateMulliganTimer(msg.mulliganTimer);
+        }
+        if (msg.cursors) {
+          updateOpponentCursor(msg.cursors);
+        }
+      }
+      if (msg.type === "realtime") {
+        // リアルタイム情報（タイマー・カーソル）の処理
+        if (msg.timer !== null && msg.timer !== undefined) {
+          updateTimerDisplay(msg.timer);
+        }
+        if (msg.mulliganTimer !== null && msg.mulliganTimer !== undefined) {
+          updateMulliganTimer(msg.mulliganTimer);
+        }
+        if (msg.cursors) {
+          updateOpponentCursor(msg.cursors);
+        }
+      }
       if (msg.type === "system" && msg.message) {
         document.getElementById("connection-status").textContent = msg.message;
         // 対戦相手が見つかったら1秒後に自動で対戦画面へ
@@ -347,6 +371,46 @@ document.addEventListener("DOMContentLoaded", () => {
     };
     connectionPanel.appendChild(input);
     connectionPanel.appendChild(btn);
+  }
+
+  // =========================
+  // リアルタイム情報処理関数
+  // =========================
+
+  function updateTimerDisplay(seconds) {
+    const timerEl = document.getElementById("timer");
+    if (timerEl && !latestState?.isMulliganPhase) {
+      timerEl.textContent = String(seconds);
+      timerEl.classList.remove("warning", "danger");
+      if (seconds <= 10) timerEl.classList.add("warning");
+      if (seconds <= 3) timerEl.classList.add("danger");
+    }
+  }
+
+  function updateOpponentCursor(cursors) {
+    // 相手のカーソル表示処理
+    const opponentRole = myRole === "player" ? "opponent" : "player";
+    const opponentCursor = cursors[opponentRole];
+    
+    if (opponentCursor) {
+      // 相手のカーソル表示を更新（必要に応じて実装）
+      console.log("相手のカーソル:", opponentCursor);
+    }
+  }
+
+  // カーソル位置をサーバーに送信（ハイライト情報は送信しない）
+  function sendCursorUpdate(x, y, cardId = null) {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      // ハイライト情報は送信せず、位置情報のみ送信
+      const payload = { x, y };
+      // cardIdは送信しない（ローカルのハイライトのみ）
+      
+      ws.send(JSON.stringify({
+        type: "action",
+        action: "cursor",
+        payload: payload
+      }));
+    }
   }
 
   // =========================
@@ -483,14 +547,12 @@ document.addEventListener("DOMContentLoaded", () => {
   function updateCardHover() {
     const hoveredCard = getCardAtCursor();
 
-    if (currentCardHovered !== hoveredCard) {
-      // render-3d.jsのカードホバー処理を呼び出し
-      if (typeof updateCardHover3D === "function") {
-        updateCardHover3D(hoveredCard, currentCardHovered);
-      }
-
-      currentCardHovered = hoveredCard;
+    // カーソルが合い続けている間は常にハイライトを維持
+    if (typeof updateCardHover3D === "function") {
+      updateCardHover3D(hoveredCard, currentCardHovered);
     }
+
+    currentCardHovered = hoveredCard;
 
     // カーソルラベルを更新
     const kbCursorLabel = document.getElementById("kb-cursor-label");
@@ -582,6 +644,8 @@ document.addEventListener("DOMContentLoaded", () => {
         const isBattle = gameRoot && gameRoot.style.display !== "none";
         if (isBattle) {
           updateCardHover();
+          // カーソル位置をサーバーに送信（ハイライト情報は送信しない）
+          sendCursorUpdate(titleCursorX, titleCursorY);
         }
       }
       moveLoop = requestAnimationFrame(loop);

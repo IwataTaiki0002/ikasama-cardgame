@@ -792,20 +792,19 @@ function updateCardSelectionHighlights(selectedCardIds) {
 
 // カードのホバー状態を更新
 function updateCardHover3D(hoveredCardId, previousCardId) {
-  // 前のカードのホバー状態を削除
-  // すべての手札カードのホバー状態をリセット
-  cardMeshes.forEach((mesh) => {
-    if (mesh.userData && mesh.userData.kind === "hand") {
-      // 選択状態でなければリセット
-      if (mesh.scale.x <= 1.05) {
-        mesh.material.emissive.setHex(0x000000);
-        mesh.material.emissiveIntensity = 0.5;
-        mesh.scale.set(1, 1, 1);
-      }
+  // 前回ホバーしていたカードのハイライトをリセット
+  if (previousCardId && previousCardId !== hoveredCardId) {
+    const prevMesh = cardMeshes.find(
+      (mesh) => mesh.userData && mesh.userData.cardId === previousCardId,
+    );
+    if (prevMesh && prevMesh.scale.x <= 1.05) {
+      prevMesh.material.emissive.setHex(0x000000);
+      prevMesh.material.emissiveIntensity = 0.5;
+      prevMesh.scale.set(1, 1, 1);
     }
-  });
+  }
 
-  // 新しいカードにホバー状態を追加
+  // 新しいカードにホバー状態を追加（同じカードでも強制的に適用）
   if (hoveredCardId) {
     const newMesh = cardMeshes.find(
       (mesh) => mesh.userData && mesh.userData.cardId === hoveredCardId,
