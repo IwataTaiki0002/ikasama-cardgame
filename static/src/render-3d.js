@@ -123,8 +123,8 @@ function createCardMesh(card, faceUp) {
   const mat = new THREE.MeshStandardMaterial({
     map: makeCardTexture(card, faceUp),
     side: THREE.DoubleSide,
-    emissive: 0xffffff,
-    emissiveIntensity: 0.05,
+    emissive: 0x000000, // 通常時は黒
+    emissiveIntensity: 0.5,
   });
   return new THREE.Mesh(geo, mat);
 }
@@ -221,57 +221,57 @@ function createZones() {
   // ===== プレイヤー側 =====
   addZoneRect(
     "P_MANA",
-    new THREE.Vector3(0.4, ZONE_Y, 5.35),
+    new THREE.Vector3(0.1, ZONE_Y, 5.39),
     11.7,
-    1.6,
+    1.52,
     0xffffff,
   );
-  addZoneRect("P_HP", new THREE.Vector3(0.4, ZONE_Y, 7.4), 11.7, 2.5, 0xffffff);
+  addZoneRect("P_HP", new THREE.Vector3(0.1, ZONE_Y, 7.4), 11.7, 2.5, 0xffffff);
 
   // ※ここはあなたの現状コードのまま（枠の場所）
   addZoneRect(
     "P_DECK",
-    new THREE.Vector3(9.0, ZONE_Y, 6.0),
-    3.4,
-    5.0,
+    new THREE.Vector3(8.4, ZONE_Y, 4.7),
+    2.6,
+    3.5,
     0xffffff,
   );
   addZoneRect(
     "P_GRAVE",
-    new THREE.Vector3(6.0, ZONE_Y, 6.0),
-    3.4,
-    5.0,
+    new THREE.Vector3(-8.25, ZONE_Y, 4.7),
+    2.6,
+    3.5,
     0xffffff,
   );
 
   // ===== 相手側 =====
   addZoneRect(
     "O_MANA",
-    new THREE.Vector3(7.4, ZONE_Y, -5.0),
-    12.5,
-    1.8,
+    new THREE.Vector3(0.1, ZONE_Y, -4.7),
+    12.2,
+    1.6,
     0xffffff,
   );
   addZoneRect(
     "O_HP",
-    new THREE.Vector3(0.8, ZONE_Y, -6.15),
-    12.8,
-    3.2,
+    new THREE.Vector3(0.1, ZONE_Y, -6.8),
+    12.2,
+    2.6,
     0xffffff,
   );
 
   addZoneRect(
     "O_DECK",
-    new THREE.Vector3(9.0, ZONE_Y, -6.0),
-    3.4,
-    4.2,
+    new THREE.Vector3(-8.25, ZONE_Y, -4.0), // 相手の山札の中心座標に移動
+    2.6,
+    3.8,
     0xffffff,
   );
   addZoneRect(
     "O_GRAVE",
-    new THREE.Vector3(6.0, ZONE_Y, -6.0),
-    3.4,
-    4.2,
+    new THREE.Vector3(8.4, ZONE_Y, -4.0),
+    2.6, //縦
+    3.8, //横
     0xffffff,
   );
 
@@ -354,8 +354,8 @@ function updateGraves(state, cardsById) {
 
   // ✅ 墓地の表示位置：createZones() の枠中心に合わせる
   // （枠線と実体がズレないように）
-  const P_GRAVE_POS = new THREE.Vector3(6.0, 0.1, 6.0);
-  const O_GRAVE_POS = new THREE.Vector3(6.0, 0.1, -6.0);
+  const P_GRAVE_POS = new THREE.Vector3(-8.25, 1.0, 5.2);
+  const O_GRAVE_POS = new THREE.Vector3(8.4, 1.0, -2.8);
 
   graveGroupPlayer = buildGraveStack(pGrave, cardsById, P_GRAVE_POS, true);
   graveGroupOpponent = buildGraveStack(oGrave, cardsById, O_GRAVE_POS, true);
@@ -404,11 +404,11 @@ function updateDecks(playerDeckCount, opponentDeckCount) {
   safeRemove(deckGroupOpponent);
 
   // ※あなたの現状座標（このまま）
-  deckGroupPlayer = buildDeckStack(pCount, new THREE.Vector3(8, 1.0, 5.5));
+  deckGroupPlayer = buildDeckStack(pCount, new THREE.Vector3(7.7, 1.0, 5.2));
   // 左上＋微調整: x=-7.5, z=-3.5
   deckGroupOpponent = buildDeckStack(
     oCount,
-    new THREE.Vector3(-7.5, 1.0, -3.5),
+    new THREE.Vector3(-7.6, 1.0, -2.8),
   );
 
   scene.add(deckGroupPlayer);
@@ -437,7 +437,12 @@ function buildChipRow(count, maxCount, kind, basePos, direction = 1) {
   const group = new THREE.Group();
   group.position.copy(basePos);
 
-  const geo = new THREE.CylinderGeometry(0.36, 0.36, 0.15, 24);
+  const geo = new THREE.CylinderGeometry(
+    0.36 * 0.91,
+    0.36 * 0.91,
+    0.15 * 0.91,
+    24,
+  );
   const mat = makeChipMaterial(kind);
   const c = clamp(count ?? 0, 0, maxCount);
 
@@ -455,7 +460,32 @@ function buildHpGrid(count, maxCount, basePos, direction = 1) {
   const group = new THREE.Group();
   group.position.copy(basePos);
 
-  const geo = new THREE.CylinderGeometry(0.35, 0.35, 0.12, 24);
+  // ハート型を上下反転・1.5倍拡大
+  const scale = 1.5;
+  const heartShape = new THREE.Shape();
+  heartShape.moveTo(0, 0.18 * scale);
+  heartShape.bezierCurveTo(
+    0.18 * scale,
+    0.32 * scale,
+    0.38 * scale,
+    0.05 * scale,
+    0,
+    -0.22 * scale,
+  );
+  heartShape.bezierCurveTo(
+    -0.38 * scale,
+    0.05 * scale,
+    -0.18 * scale,
+    0.32 * scale,
+    0,
+    0.18 * scale,
+  );
+
+  const extrudeSettings = {
+    depth: 0.12, // 厚みだけ元の値に戻す
+    bevelEnabled: false,
+  };
+  const geo = new THREE.ExtrudeGeometry(heartShape, extrudeSettings);
   const mat = makeChipMaterial("hp");
   const c = clamp(count ?? 0, 0, maxCount);
 
@@ -463,10 +493,17 @@ function buildHpGrid(count, maxCount, basePos, direction = 1) {
     const chip = new THREE.Mesh(geo, mat);
     const row = Math.floor(i / 10);
     const col = i % 10;
-    chip.position.x = direction * (col * 1.0 + row * 0.5);
-    chip.position.z = direction === 1 ? row * 1.0 : -(row * 1.0);
+    const spacing = 0.95; // 間隔をやや短く
+    chip.position.x = direction * (col * spacing + row * 0.5 * spacing);
+    chip.position.z = direction === 1 ? row * spacing : -(row * spacing);
     chip.position.y = 0.06;
     chip.visible = i < c;
+    // ハート型を正面に向けて回転
+    chip.rotation.x = -Math.PI / 2;
+    // 相手側（direction=-1）の場合は上下反転
+    if (direction === -1) {
+      chip.rotation.x += Math.PI;
+    }
     group.add(chip);
   }
   return group;
@@ -486,7 +523,7 @@ function updateChips(player, opponent) {
     player?.mana ?? 0,
     MAX_MANA_TOKENS,
     "mana",
-    new THREE.Vector3(-4.1, 1.0, 5.8),
+    new THREE.Vector3(-4.4, 1.0, 5.9),
     +1,
   );
   // 手前の白線（P_HPゾーン: x=0.4, z=7.4）に合わせて配置
@@ -501,13 +538,13 @@ function updateChips(player, opponent) {
     opponent?.mana ?? 0,
     MAX_MANA_TOKENS,
     "mana",
-    new THREE.Vector3(0, 1.0, -1.2),
+    new THREE.Vector3(0.7, 1.0, -3.4),
     +1,
   );
   chips.opponent.hp = buildHpGrid(
     opponent?.hp ?? 0,
     MAX_HP_TOKENS,
-    new THREE.Vector3(0, 1.0, -2.2),
+    new THREE.Vector3(4.6, 1.0, -5.0),
     -1,
   );
 
@@ -706,4 +743,96 @@ function renderFromState(state, myRole) {
   });
 }
 
-export { initThree, renderFromState, setInputHandlers, hitTestAtScreen };
+// ===== マリガンカード選択とホバー処理 =====
+
+// 画面座標からカーソルの下にあるカードを取得
+function getCardUnderCursor(screenX, screenY) {
+  if (!renderer || !camera || !raycaster) return null;
+
+  // 画面座標を正規化座標に変換
+  const rect = renderer.domElement.getBoundingClientRect();
+  const x = ((screenX - rect.left) / rect.width) * 2 - 1;
+  const y = -((screenY - rect.top) / rect.height) * 2 + 1;
+
+  raycaster.setFromCamera({ x, y }, camera);
+
+  // 手札のカードのみをチェック
+  const intersects = raycaster.intersectObjects(cardMeshes);
+
+  if (intersects.length > 0) {
+    const mesh = intersects[0].object;
+    if (mesh.userData && mesh.userData.kind === "hand") {
+      return mesh.userData.cardId;
+    }
+  }
+
+  return null;
+}
+
+// カードの選択状態ハイライトを更新
+function updateCardSelectionHighlights(selectedCardIds) {
+  cardMeshes.forEach((mesh) => {
+    if (mesh.userData && mesh.userData.kind === "hand") {
+      const isSelected = selectedCardIds.includes(mesh.userData.cardId);
+
+      if (isSelected) {
+        // 選択状態：赤い枠線効果
+        mesh.material.emissive.setHex(0xffff00); // 選択も黄色
+        mesh.material.emissiveIntensity = 0.5;
+        mesh.scale.set(1.1, 1.1, 1.1);
+      } else {
+        // 通常状態
+        mesh.material.emissive.setHex(0x000000);
+        mesh.material.emissiveIntensity = 0.5;
+        mesh.scale.set(1, 1, 1);
+      }
+    }
+  });
+}
+
+// カードのホバー状態を更新
+function updateCardHover3D(hoveredCardId, previousCardId) {
+  // 前のカードのホバー状態を削除
+  // すべての手札カードのホバー状態をリセット
+  cardMeshes.forEach((mesh) => {
+    if (mesh.userData && mesh.userData.kind === "hand") {
+      // 選択状態でなければリセット
+      if (mesh.scale.x <= 1.05) {
+        mesh.material.emissive.setHex(0x000000);
+        mesh.material.emissiveIntensity = 0.5;
+        mesh.scale.set(1, 1, 1);
+      }
+    }
+  });
+
+  // 新しいカードにホバー状態を追加
+  if (hoveredCardId) {
+    const newMesh = cardMeshes.find(
+      (mesh) => mesh.userData && mesh.userData.cardId === hoveredCardId,
+    );
+    if (newMesh) {
+      // 選択状態でない場合のみホバー効果
+      const isSelected = newMesh.scale.x > 1.05;
+      if (!isSelected) {
+        newMesh.material.emissive.setHex(0xffff00); // ホバー時は黄色
+        newMesh.material.emissiveIntensity = 0.5;
+        newMesh.scale.set(1.08, 1.08, 1.08);
+      }
+    }
+  }
+}
+
+// main.js で使用するためにグローバルに公開
+window.getCardUnderCursor = getCardUnderCursor;
+window.updateCardSelectionHighlights = updateCardSelectionHighlights;
+window.updateCardHover3D = updateCardHover3D;
+
+export {
+  initThree,
+  renderFromState,
+  setInputHandlers,
+  hitTestAtScreen,
+  getCardUnderCursor,
+  updateCardSelectionHighlights,
+  updateCardHover3D,
+};

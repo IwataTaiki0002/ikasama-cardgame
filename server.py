@@ -204,13 +204,21 @@ class Room:
         if self.first_attack_role is None:
             self.first_attack_role = random.choice(["player", "opponent"])
 
-        # 初期手札（3枚）
-        self.state.player.hand = [c.id for c in CARD_DB[:3]]
-        self.state.opponent.hand = [c.id for c in CARD_DB[:3]]
+        # 先攻3枚、後攻4枚の初期手札を自動的に配る
+        if self.first_attack_role == "player":
+            # playerが先攻なので3枚
+            self.state.player.hand = [c.id for c in CARD_DB[:3]]
+            # opponentが後攻なので4枚
+            self.state.opponent.hand = [c.id for c in CARD_DB[:4]]
+        else:
+            # opponentが先攻なので3枚
+            self.state.opponent.hand = [c.id for c in CARD_DB[:3]]
+            # playerが後攻なので4枚
+            self.state.player.hand = [c.id for c in CARD_DB[:4]]
         
-        # マリガンフェーズを開始
+        # カード配布後、マリガン選択フェーズを開始
         self.state.isMulliganPhase = True
-        self.state.mulliganTimer = 10
+        self.state.mulliganTimer = 10  # マリガン選択時間を10秒に
         self.state.playerMulliganDone = False
         self.state.opponentMulliganDone = False
         self.state.playerMulliganCards.clear()

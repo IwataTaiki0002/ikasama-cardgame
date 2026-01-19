@@ -129,9 +129,11 @@ document.addEventListener("DOMContentLoaded", () => {
   let latestState = null;
   let threeInitialized = false;
   let firstAttackOrder = null; // "player" または "opponent"
-  let mulliganSelectedCards = [];
+  let mulliganSelectedCards = []; // マリガンで選択されたカードIDの配列
   let mulliganDone = false;
   let attackOrderShown = false;
+  let mulliganTimerInterval = null;
+  let currentCardHovered = null; // 現在カーソルが当たっているカード
 
   function connectWebSocket(roomId, mode = "create") {
     if (ws) ws.close();
@@ -172,6 +174,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const gameRoot = document.getElementById("game-root");
         if (connectionPanel) connectionPanel.style.display = "none";
         if (gameRoot) gameRoot.style.display = "block";
+
         // 対戦画面でキーボードカーソルを表示
         const kbCursor = document.getElementById("kb-cursor");
         if (kbCursor) {
@@ -199,6 +202,10 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       function updateAttackOrderDisplay(state) {
         if (attackOrderShown) return; // 既に表示済みなら何もしない
+
+        // 新しいゲーム開始時にマリガンメッセージ状態をリセット
+        mulliganMessageShown = false;
+
         const playerOrderEl = document.getElementById("player-attack-order");
         const opponentOrderEl = document.getElementById(
           "opponent-attack-order",
@@ -220,13 +227,24 @@ document.addEventListener("DOMContentLoaded", () => {
             opponentOrderEl.textContent = "先攻";
             opponentOrderEl.style.color = "#ff4444";
           }
-          // 3秒後に自動で非表示し、マリガンUIを表示
+          // 3秒後に自動で非表示し、0.5秒後にマリガン吹き出しを表示
           setTimeout(() => {
             if (playerOrderEl) playerOrderEl.style.display = "none";
             if (opponentOrderEl) opponentOrderEl.style.display = "none";
-            // マリガンUIを表示
-            showMulliganUI(state);
+
+            // 先攻後攻表示が消えてから0.5秒後にマリガンメッセージを表示開始
+            setTimeout(() => {
+              if (state && state.isMulliganPhase && state.mulliganTimer > 0) {
+                showMulliganMessage(state);
+              }
+            }, 500);
           }, 3000);
+          // マリガン用タイマー
+          function startMulliganTimer() {
+            // サーバーstateのmulliganTimerのみでUIを制御するため、ローカルタイマーは廃止
+            // タイマー表示はupdateMulliganUIで行う
+            // 必要なら自動でマリガン確定処理をここに追加可能
+          }
         }
       }
       if (msg.type === "state" && msg.state) {
@@ -238,9 +256,9 @@ document.addEventListener("DOMContentLoaded", () => {
         }
         // マリガンフェーズの処理
         if (msg.state.isMulliganPhase) {
-          updateMulliganUI(msg.state);
+          handleMulliganDisplay(msg.state);
         } else {
-          hideMulliganUI();
+          hideMulliganMessage();
         }
         // デバッグ: 受信stateの中身を確認
         console.log("state.player", latestState.player);
@@ -249,6 +267,7 @@ document.addEventListener("DOMContentLoaded", () => {
         // 対戦画面に遷移済みなら描画
         const gameRoot = document.getElementById("game-root");
         const container = document.getElementById("game-3d-container");
+
         if (gameRoot && gameRoot.style.display === "block" && container) {
           renderFromState(latestState, myRole);
         }
@@ -330,144 +349,164 @@ document.addEventListener("DOMContentLoaded", () => {
     connectionPanel.appendChild(btn);
   }
 
-  // マリガンUI関連関数
-  function showMulliganUI(state) {
-    if (!state || !state.isMulliganPhase) return;
-    latestState = state;
-    const mulliganPanel = document.getElementById("mulligan-panel");
-    if (mulliganPanel) {
-      mulliganPanel.style.display = "block";
-      updateMulliganHand();
-      setupMulliganEvents();
+  // =========================
+  // 新しいマリガンUI関数（シンプル版）
+  // =========================
+
+  let mulliganMessageShown = false; // マリガンメッセージが表示中かどうか
+
+  function showMulliganMessage(state) {
+    if (!state || !state.isMulliganPhase || mulliganMessageShown) return;
+
+    const message = document.getElementById("mulligan-message");
+    const timer = document.getElementById("timer");
+
+    if (message) {
+      message.style.display = "block";
+      message.classList.add("show");
+      message.classList.remove("hide");
+      mulliganMessageShown = true;
+      updateMulliganTimer(state.mulliganTimer);
+    }
+
+    // タイマー要素を表示してマリガン時間を表示
+    if (timer) {
+      timer.style.display = "block";
+      timer.textContent = state.mulliganTimer;
     }
   }
 
-  function hideMulliganUI() {
-    const mulliganPanel = document.getElementById("mulligan-panel");
-    if (mulliganPanel) {
-      mulliganPanel.style.display = "none";
+  function hideMulliganMessage() {
+    const message = document.getElementById("mulligan-message");
+    const timer = document.getElementById("timer");
+
+    if (message && mulliganMessageShown) {
+      message.classList.add("hide");
+      message.classList.remove("show");
+      mulliganMessageShown = false;
+      // アニメーション完了後に完全に非表示
+      setTimeout(() => {
+        message.style.display = "none";
+      }, 300);
+    }
+
+    // タイマー要素も非表示
+    if (timer) {
+      timer.style.display = "none";
     }
   }
 
-  function updateMulliganUI(state) {
-    // タイマー更新
-    const timerEl = document.getElementById("mulligan-timer");
-    if (timerEl) {
-      timerEl.textContent = `残り時間: ${state.mulliganTimer}秒`;
-      if (state.mulliganTimer <= 3) {
-        timerEl.style.color = "#ff0000";
-      } else if (state.mulliganTimer <= 5) {
-        timerEl.style.color = "#ff8800";
+  function updateMulliganTimer(seconds) {
+    const timer = document.getElementById("timer");
+    if (timer && mulliganMessageShown) {
+      timer.textContent = seconds;
+      // タイマーの色を変更
+      if (seconds <= 3) {
+        timer.style.color = "#ff0000";
+        timer.classList.add("danger");
+      } else if (seconds <= 5) {
+        timer.style.color = "#ff8800";
+        timer.classList.add("warning");
       } else {
-        timerEl.style.color = "#ff4444";
+        timer.style.color = "#fff";
+        timer.classList.remove("warning", "danger");
       }
     }
   }
 
-  function updateMulliganHand() {
-    if (!latestState || !latestState.player) return;
+  // マリガンメッセージの表示タイミング制御
+  function handleMulliganDisplay(state) {
+    // マリガンフェーズ終了時は即座に非表示
+    if (!state.isMulliganPhase || state.mulliganTimer <= 0) {
+      hideMulliganMessage();
+      return;
+    }
 
-    const handEl = document.getElementById("mulligan-hand");
-    if (!handEl) return;
-
-    handEl.innerHTML = "";
-    mulliganSelectedCards = [];
-
-    latestState.player.hand.forEach((cardId, index) => {
-      const card = latestState.cards.find((c) => c.id === cardId);
-      if (!card) return;
-
-      const cardEl = document.createElement("div");
-      cardEl.className = "mulligan-card";
-      cardEl.style.cssText = `
-        width: 80px;
-        height: 110px;
-        background: linear-gradient(135deg, #333, #555);
-        border: 2px solid #666;
-        border-radius: 8px;
-        color: white;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        padding: 8px;
-        cursor: pointer;
-        transition: all 0.3s ease;
-        font-size: 0.8em;
-      `;
-
-      cardEl.innerHTML = `
-        <div style="font-weight: bold; text-align: center;">${card.name}</div>
-        <div style="text-align: center;">
-          <div>コスト: ${card.cost}</div>
-          <div>${card.power}/${card.toughness}</div>
-        </div>
-      `;
-
-      cardEl.onclick = () => toggleMulliganCard(index, cardEl);
-      handEl.appendChild(cardEl);
-    });
+    // マリガンタイマーの更新のみ（表示/非表示は先攻後攻表示後に制御）
+    if (mulliganMessageShown) {
+      updateMulliganTimer(state.mulliganTimer);
+    }
   }
 
-  function toggleMulliganCard(index, cardEl) {
-    const isSelected = mulliganSelectedCards.includes(index);
+  // =========================
+  // マリガンカード選択関数
+  // =========================
 
-    if (isSelected) {
+  // カードの選択状態を切り替える
+  function toggleMulliganCardSelection(cardId) {
+    if (!latestState || !latestState.isMulliganPhase) return;
+
+    const index = mulliganSelectedCards.indexOf(cardId);
+    if (index >= 0) {
       // 選択解除
-      mulliganSelectedCards = mulliganSelectedCards.filter((i) => i !== index);
-      cardEl.style.border = "2px solid #666";
-      cardEl.style.transform = "scale(1)";
-      cardEl.style.backgroundColor = "linear-gradient(135deg, #333, #555)";
+      mulliganSelectedCards.splice(index, 1);
     } else {
       // 選択
-      mulliganSelectedCards.push(index);
-      cardEl.style.border = "3px solid #ff4444";
-      cardEl.style.transform = "scale(1.1)";
-      cardEl.style.background = "linear-gradient(135deg, #554433, #776655)";
+      mulliganSelectedCards.push(cardId);
+    }
+
+    // カードのハイライト表示を更新（Three.jsで処理）
+    updateMulliganCardHighlights();
+
+    console.log("選択されたカード:", mulliganSelectedCards);
+  }
+
+  // カードのハイライト表示を更新（Three.js用に修正）
+  function updateMulliganCardHighlights() {
+    // Three.jsでハイライト処理する場合は、render-3d.jsの関数を呼び出し
+    if (typeof updateCardSelectionHighlights === "function") {
+      updateCardSelectionHighlights(mulliganSelectedCards);
     }
   }
 
-  function setupMulliganEvents() {
-    const confirmBtn = document.getElementById("mulligan-confirm");
-    const skipBtn = document.getElementById("mulligan-skip");
+  // カーソル位置にあるカードを取得（Three.js Raycaster使用）
+  function getCardAtCursor() {
+    if (!latestState || !latestState.player || !latestState.player.hand)
+      return null;
 
-    if (confirmBtn) {
-      confirmBtn.onclick = () => {
-        if (mulliganDone) return;
-        mulliganDone = true;
+    // render-3d.jsのgetCardUnderCursor関数を使用
+    if (typeof getCardUnderCursor === "function") {
+      const kbCursor = document.getElementById("kb-cursor");
+      if (!kbCursor) return null;
 
-        if (ws) {
-          ws.send(
-            JSON.stringify({
-              type: "action",
-              action: "mulligan",
-              payload: {
-                cardIndices: mulliganSelectedCards,
-              },
-            }),
-          );
-        }
-      };
+      const cursorRect = kbCursor.getBoundingClientRect();
+      const x = cursorRect.left + cursorRect.width / 2;
+      const y = cursorRect.top + cursorRect.height / 2;
+
+      return getCardUnderCursor(x, y);
     }
 
-    if (skipBtn) {
-      skipBtn.onclick = () => {
-        if (mulliganDone) return;
-        mulliganDone = true;
+    return null;
+  }
 
-        if (ws) {
-          ws.send(
-            JSON.stringify({
-              type: "action",
-              action: "mulligan",
-              payload: {
-                cardIndices: [],
-              },
-            }),
-          );
-        }
-      };
+  // カードホバー状態を更新（Three.js用に修正）
+  function updateCardHover() {
+    const hoveredCard = getCardAtCursor();
+
+    if (currentCardHovered !== hoveredCard) {
+      // render-3d.jsのカードホバー処理を呼び出し
+      if (typeof updateCardHover3D === "function") {
+        updateCardHover3D(hoveredCard, currentCardHovered);
+      }
+
+      currentCardHovered = hoveredCard;
+    }
+
+    // カーソルラベルを更新
+    const kbCursorLabel = document.getElementById("kb-cursor-label");
+    if (kbCursorLabel) {
+      if (currentCardHovered && latestState && latestState.isMulliganPhase) {
+        const isSelected = mulliganSelectedCards.includes(currentCardHovered);
+        kbCursorLabel.textContent = isSelected ? "選択解除" : "選択";
+      } else {
+        kbCursorLabel.textContent = "";
+      }
     }
   }
+
+  // =========================
+  // カーソル移動・UI操作関数
+  // =========================
 
   console.log("main.js loaded");
 
@@ -538,6 +577,12 @@ document.addEventListener("DOMContentLoaded", () => {
         titleCursorX = clamp(titleCursorX, 8, window.innerWidth - 8);
         titleCursorY = clamp(titleCursorY, 8, window.innerHeight - 8);
         updateTitleCursor();
+
+        // 対戦画面でのカードホバー更新
+        const isBattle = gameRoot && gameRoot.style.display !== "none";
+        if (isBattle) {
+          updateCardHover();
+        }
       }
       moveLoop = requestAnimationFrame(loop);
     }
@@ -603,8 +648,14 @@ document.addEventListener("DOMContentLoaded", () => {
             beginTransition();
           }
         } else if (isBattle) {
-          // 対戦画面：ここにZキー等のアクション処理を追加（必要に応じて）
-          // 例: カード選択やメニュー表示など
+          // 対戦画面：マリガンフェーズ中の場合、カード選択
+          if (
+            latestState &&
+            latestState.isMulliganPhase &&
+            currentCardHovered
+          ) {
+            toggleMulliganCardSelection(currentCardHovered);
+          }
           // console.log("Battle Z/Enter pressed");
         }
       }

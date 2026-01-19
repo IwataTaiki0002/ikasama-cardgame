@@ -541,3 +541,95 @@ canvas {
     transform: translateY(0);
   }
 }
+
+/* マリガンメッセージスタイル */
+.mulligan-message {
+  display: none;
+  position: fixed;
+  bottom: 30%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  background: rgba(0, 0, 0, 0.95);
+  border: 3px solid #ffaa00;
+  border-radius: 20px;
+  box-shadow:
+    0 8px 32px rgba(255, 170, 0, 0.8),
+    inset 0 2px 4px rgba(255, 255, 255, 0.1);
+  animation: mulligan-appear 0.5s ease-out;
+}
+
+.mulligan-content {
+  padding: 24px 48px;
+  text-align: center;
+}
+
+.mulligan-text {
+  font-size: 1.6em;
+  font-weight: bold;
+  color: #ffaa00;
+  margin-bottom: 16px;
+  letter-spacing: 2px;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.mulligan-instruction {
+  font-size: 1.2em;
+  color: #ffffff;
+  opacity: 0.9;
+  font-style: italic;
+}
+
+@keyframes mulligan-appear {
+  0% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(30px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0px) scale(1);
+  }
+}
+
+/* マリガンメッセージが表示されているときの状態 */
+.mulligan-message.show {
+  display: block;
+}
+
+/* マリガンメッセージのアニメーション終了時の処理 */
+.mulligan-message.hide {
+  animation: mulligan-disappear 0.3s ease-in forwards;
+}
+
+@keyframes mulligan-disappear {
+  0% {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0px) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-20px) scale(0.9);
+  }
+}
+
+/* マリガンカード選択とホバー状態のスタイル */
+.mulligan-selected {
+  border: 3px solid #ff6b6b !important;
+  box-shadow: 0 0 15px rgba(255, 107, 107, 0.8) !important;
+  transform: translateY(-5px) !important;
+  background: rgba(255, 107, 107, 0.1) !important;
+}
+
+.card-hovered {
+  border: 2px solid #4ecdc4 !important;
+  box-shadow: 0 0 10px rgba(78, 205, 196, 0.6) !important;
+  transform: scale(1.05) !important;
+  transition: all 0.2s ease;
+}
+
+/* 選択状態とホバー状態が重複した場合 */
+.mulligan-selected.card-hovered {
+  border: 3px solid #ff9500 !important;
+  box-shadow: 0 0 20px rgba(255, 149, 0, 0.8) !important;
+  transform: translateY(-5px) scale(1.05) !important;
+}
